@@ -5,6 +5,7 @@
   "description": "Terminal wrapper with project-specific banner images",
   "main": "main.js",
   "scripts": {
+    "postinstall": "node scripts/patch-electron-name.js",
     "start": "electron .",
     "rebuild": "electron-rebuild"
   },

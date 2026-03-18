@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, nativeImage, Menu } = require('electron');
+const { app, BrowserWindow, ipcMain, nativeImage, Menu, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const pty = require('node-pty');
@@ -11,6 +11,30 @@ const windows = new Map(); // BrowserWindow id -> { window, ptyProcess, pollInte
 
 const TERMINAL_DIR = '.terminal';
 const IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg'];
+
+function detectGitInfo(cwd) {
+  try {
+    const { execSync } = require('child_process');
+    // Check if inside a git repo
+    const gitRoot = execSync('git rev-parse --show-toplevel 2>/dev/null', { cwd, encoding: 'utf8', timeout: 1000 }).trim();
+    if (!gitRoot) return null;
+    const branch = execSync('git rev-parse --abbrev-ref HEAD 2>/dev/null', { cwd, encoding: 'utf8', timeout: 1000 }).trim();
+    let remoteUrl = null;
+    try {
+      const raw = execSync('git remote get-url origin 2>/dev/null', { cwd, encoding: 'utf8', timeout: 1000 }).trim();
+      if (raw) {
+        // Convert SSH URL to HTTPS
+        remoteUrl = raw
+          .replace(/^git@github\.com:/, 'https://github.com/')
+          .replace(/^git@([^:]+):/, 'https://$1/')
+          .replace(/\.git$/, '');
+      }
+    } catch (_e) { /* no remote */ }
+    return { branch, remoteUrl };
+  } catch (_e) {
+    return null;
+  }
+}
 
 function findProjectConfig(cwd) {
   // Walk up from cwd to find the nearest .terminal/ directory
@@ -399,17 +423,20 @@ function createWindow(startDir) {
           const svg = buildSpecialDirIconSvg(specialIcon, 24, color);
           if (svg) finalIconData = `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`;
         }
+        const gitInfo = detectGitInfo(cwd);
         win.webContents.send('update-banner', {
           cwd,
           bannerData,
           iconData: finalIconData,
           projectName,
           config,
+          gitInfo,
         });
-        // Update dock icon for the focused window
+        // Update dock icon and menu for the focused window
         if (win.isFocused()) {
           updateDockIcon(projectName, config, iconPath, specialIcon);
         }
+        updateMenuForDirectory(cwd);
       }
     } catch (_e) {
       // ignore errors in cwd detection
@@ -444,14 +471,17 @@ ipcMain.on('terminal-ready', (event) => {
     const svg = buildSpecialDirIconSvg(specialIcon, 24, color);
     if (svg) finalIconData = `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`;
   }
+  const gitInfo = detectGitInfo(entry.startDir);
   win.webContents.send('update-banner', {
     cwd: entry.startDir,
     bannerData,
     iconData: finalIconData,
     projectName,
     config,
+    gitInfo,
   });
   updateDockIcon(projectName, config, iconPath, specialIcon);
+  updateMenuForDirectory(entry.startDir);
 });
 
 ipcMain.on('terminal-input', (event, data) => {
@@ -465,6 +495,18 @@ ipcMain.on('set-title', (event, title) => {
   if (win && !win.isDestroyed()) win.setTitle(title);
 });
 
+ipcMain.on('open-external', (_event, url) => {
+  if (typeof url === 'string' && (url.startsWith('https://') || url.startsWith('http://'))) {
+    shell.openExternal(url);
+  }
+});
+
+ipcMain.on('open-in-finder', (_event, dirPath) => {
+  if (typeof dirPath === 'string' && fs.existsSync(dirPath)) {
+    shell.openPath(dirPath);
+  }
+});
+
 ipcMain.on('terminal-resize', (event, { cols, rows }) => {
   const win = BrowserWindow.fromWebContents(event.sender);
   const entry = windows.get(win.id);
@@ -473,8 +515,64 @@ ipcMain.on('terminal-resize', (event, { cols, rows }) => {
   }
 });
 
-function buildMenu() {
+// Detect package.json scripts by walking up from cwd
+function findPackageScripts(cwd) {
+  let dir = cwd;
+  while (dir !== path.dirname(dir)) {
+    const pkgPath = path.join(dir, 'package.json');
+    if (fs.existsSync(pkgPath)) {
+      try {
+        const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+        if (pkg.scripts && Object.keys(pkg.scripts).length > 0) {
+          return { scripts: pkg.scripts, root: dir, manager: fs.existsSync(path.join(dir, 'yarn.lock')) ? 'yarn' : 'npm' };
+        }
+      } catch (_e) { /* ignore */ }
+      return null;
+    }
+    dir = path.dirname(dir);
+  }
+  return null;
+}
+
+let currentScripts = null;
+
+function updateMenuForDirectory(cwd) {
+  const pkg = findPackageScripts(cwd);
+  const scriptsKey = pkg ? JSON.stringify(pkg.scripts) : null;
+  const currentKey = currentScripts ? JSON.stringify(currentScripts.scripts) : null;
+  if (scriptsKey !== currentKey) {
+    currentScripts = pkg;
+    Menu.setApplicationMenu(buildMenu(pkg));
+  }
+}
+
+function runScriptInFocusedWindow(command) {
+  const win = BrowserWindow.getFocusedWindow();
+  if (!win) return;
+  const entry = windows.get(win.id);
+  if (entry) {
+    entry.ptyProcess.write(command + '\n');
+  }
+}
+
+function buildMenu(pkg) {
   const isMac = process.platform === 'darwin';
+
+  // Build Run menu items from package.json scripts
+  let runMenu = null;
+  if (pkg && pkg.scripts) {
+    const prefix = pkg.manager === 'yarn' ? 'yarn' : 'npm run';
+    const scriptItems = Object.keys(pkg.scripts).map(name => ({
+      label: name,
+      sublabel: pkg.scripts[name],
+      click: () => runScriptInFocusedWindow(`${prefix} ${name}`),
+    }));
+    runMenu = {
+      label: 'Run',
+      submenu: scriptItems,
+    };
+  }
+
   const template = [
     // App menu (macOS only)
     ...(isMac ? [{
@@ -558,6 +656,8 @@ function buildMenu() {
         { role: 'togglefullscreen' },
       ],
     },
+    // Run menu (only if package.json scripts exist)
+    ...(runMenu ? [runMenu] : []),
     // Window menu
     {
       label: 'Window',
@@ -581,7 +681,7 @@ function buildMenu() {
 
 app.whenReady().then(() => {
   initSpecialDirs();
-  Menu.setApplicationMenu(buildMenu());
+  Menu.setApplicationMenu(buildMenu(null));
   createWindow(getStartDir());
 });
 

@@ -12,4 +12,6 @@ contextBridge.exposeInMainWorld('terminalAPI', {
   onMenuSelectAll: (callback) => ipcRenderer.on('menu-select-all', () => callback()),
   onMenuClear: (callback) => ipcRenderer.on('menu-clear', () => callback()),
   onMenuZoom: (callback) => ipcRenderer.on('menu-zoom', (_event, direction) => callback(direction)),
+  openExternal: (url) => ipcRenderer.send('open-external', url),
+  openInFinder: (dirPath) => ipcRenderer.send('open-in-finder', dirPath),
 });
