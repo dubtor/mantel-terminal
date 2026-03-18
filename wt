@@ -1,5 +1,5 @@
 #!/bin/bash
-# Wrapped Terminal launcher
+# Mantel — Terminal Wrapper launcher
 # Usage:
 #   wt                    - Open in current directory
 #   wt /path/to/project   - Open in specific directory
@@ -11,7 +11,7 @@ if [ "$1" = "--set-banner" ]; then
   if [ -z "$2" ]; then
     echo "Usage: wt --set-banner <image-path> [project-dir]"
     echo ""
-    echo "Copies the image to <project-dir>/.terminal/banner.<ext>"
+    echo "Copies the image to <project-dir>/.mantel/banner.<ext>"
     echo "so it can be checked into the repo."
     exit 1
   fi
@@ -21,9 +21,9 @@ if [ "$1" = "--set-banner" ]; then
   PROJECT_DIR="$(cd "$PROJECT_DIR" && pwd)"
   EXT="${IMAGE##*.}"
 
-  mkdir -p "$PROJECT_DIR/.terminal"
-  cp "$IMAGE" "$PROJECT_DIR/.terminal/banner.${EXT}"
-  echo "Banner set: $PROJECT_DIR/.terminal/banner.${EXT}"
+  mkdir -p "$PROJECT_DIR/.mantel"
+  cp "$IMAGE" "$PROJECT_DIR/.mantel/banner.${EXT}"
+  echo "Banner set: $PROJECT_DIR/.mantel/banner.${EXT}"
   exit 0
 fi
 

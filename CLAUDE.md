@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Wrapped Terminal is an Electron-based desktop terminal emulator that displays project-specific banners and branding when navigating between directories. It detects the current working directory via polling and loads customization from `.terminal/` folders in project roots.
+Mantel is an Electron-based terminal wrapper that displays project-specific banners and branding when navigating between directories. It detects the current working directory via polling and loads customization from `.mantel/` folders in project roots.
 
 ## Commands
 
@@ -19,25 +19,27 @@ There are no tests or linting configured.
 
 Classic Electron main/renderer split across three files:
 
-- **`main.js`** — Main process. Spawns a PTY shell via `node-pty`, handles IPC, polls for directory changes using `lsof` every 2 seconds, discovers `.terminal/` config by walking up the directory tree, and sends banner updates to the renderer.
-- **`preload.js`** — Context bridge exposing `terminalAPI` to the renderer with methods for data I/O, resizing, and banner updates.
-- **`index.html`** — Renderer process (all inline). Uses xterm.js for the terminal display, renders a dynamic banner area with project name/icon/image, and handles resize events.
+- **`main.js`** — Main process. Manages windows and tabs, each tab with its own PTY via `node-pty`. Polls for directory changes using `lsof` every 2 seconds, discovers `.mantel/` config by walking up the directory tree, detects SSH sessions, generates dynamic dock icons, and provides a contextual Run menu from `package.json` scripts.
+- **`preload.js`** — Context bridge exposing `terminalAPI` to the renderer with methods for tab lifecycle, data I/O, resizing, banner updates, and menu actions.
+- **`index.html`** — Renderer process (all inline). Manages multiple xterm.js terminals (one per tab), renders a colored tab bar, a dynamic banner area with project name/icon/git info, and handles resize/menu events.
 - **`wt`** — Bash launcher script that resolves the target directory and starts Electron.
+- **`scripts/patch-electron-name.js`** — Postinstall script that patches the Electron binary's Info.plist to display "Mantel" in the macOS menu bar.
 
 ### IPC Flow
 
 1. Renderer signals `terminal-ready`
-2. Main responds with `update-banner` (project config + images as data URLs)
-3. Terminal data flows via `terminal-data` (main→renderer) and `terminal-input` (renderer→main)
-4. Resize events flow via `terminal-resize`
+2. Main creates first tab, responds with `tab-created` (includes banner payload)
+3. Terminal data flows via `terminal-data` (main→renderer) and `terminal-input` (renderer→main), both keyed by `tabId`
+4. Resize events flow via `terminal-resize` (keyed by `tabId`)
+5. Tab lifecycle: `create-tab`, `close-tab`, `set-active-tab`, `tab-created`, `tab-closed`
 
 ### Directory Change Detection
 
-Main process polls every 2s using `lsof -p <pid> -Fn` on macOS to get the shell's current working directory. When it changes, it re-discovers the nearest `.terminal/` config and pushes an `update-banner` event.
+Per-tab polling every 2s using `lsof -p <pid> -Fn` on macOS to get the shell's current working directory. When it changes, it re-discovers the nearest `.mantel/` config and pushes an `update-banner` event. Also detects SSH sessions via child process inspection.
 
 ### Project Customization
 
-Projects opt in by creating a `.terminal/` directory containing:
+Projects opt in by creating a `.mantel/` directory containing:
 - `config.json` — Optional: `{ name, color, textColor }`
 - `banner.*` (png/jpg/gif/webp/svg) — Full-width banner image
 - `icon.*` — Project icon (falls back to auto-generated initial with hashed color)
@@ -47,8 +49,8 @@ Projects opt in by creating a `.terminal/` directory containing:
 - **electron** — Desktop app shell
 - **node-pty** — PTY spawning for the shell process
 - **@xterm/xterm** + **@xterm/addon-fit** — Terminal emulator UI
-- **sharp** — Image processing (in deps, available for banner manipulation)
+- **sharp** — Image processing for dynamic dock icon generation
 
 ## Platform
 
-Currently macOS-focused (uses `lsof` for CWD detection, zsh as default shell, macOS titlebar styling).
+Currently macOS-focused (uses `lsof` for CWD detection, `app.dock` for dock icons, zsh as default shell).

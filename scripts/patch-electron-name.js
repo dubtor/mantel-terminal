@@ -1,4 +1,4 @@
-// Patches the Electron.app Info.plist to show "Wrapped Terminal" instead of "Electron"
+// Patches the Electron.app Info.plist to show "Mantel" instead of "Electron"
 const { execSync } = require('child_process');
 const path = require('path');
 const fs = require('fs');
@@ -10,7 +10,7 @@ if (!fs.existsSync(plist)) {
   process.exit(0);
 }
 
-const name = 'Wrapped Terminal';
+const name = 'Mantel';
 
 try {
   execSync(`/usr/libexec/PlistBuddy -c "Set :CFBundleName '${name}'" "${plist}"`);

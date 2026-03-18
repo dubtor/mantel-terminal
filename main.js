@@ -5,14 +5,14 @@ const pty = require('node-pty');
 const sharp = require('sharp');
 const { execSync } = require('child_process');
 
-app.setName('Wrapped Terminal');
+app.setName('Mantel');
 
 // Track all open terminal windows: windowId -> { window, tabs, activeTabId, startDir }
 // Each tab: tabId -> { ptyProcess, pollInterval, startDir, lastCwd, lastSSHHost }
 const windows = new Map();
 let nextTabId = 1;
 
-const TERMINAL_DIR = '.terminal';
+const TERMINAL_DIR = '.mantel';
 const IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg'];
 
 function detectGitInfo(cwd) {

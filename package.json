@@ -1,8 +1,8 @@
 {
-  "name": "wrapped-terminal",
-  "productName": "Wrapped Terminal",
+  "name": "mantel",
+  "productName": "Mantel",
   "version": "1.0.0",
-  "description": "Terminal wrapper with project-specific banner images",
+  "description": "Terminal wrapper with project-specific branding, tabs, and contextual menus",
   "main": "main.js",
   "scripts": {
     "postinstall": "node scripts/patch-electron-name.js",
