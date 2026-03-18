@@ -10,7 +10,7 @@
     html, body {
       height: 100%;
       overflow: hidden;
-      background: #1e1e2e;
+      background: #000000;
       font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif;
     }
 
@@ -20,27 +20,19 @@
       height: 100%;
     }
 
-    /* Project banner */
-    #banner {
+    /* Project info bar */
+    #infobar {
       position: relative;
       height: 50px;
       min-height: 50px;
       overflow: hidden;
-      background: #1e1e2e;
+      background: #000000;
       display: flex;
       align-items: center;
       transition: opacity 0.3s ease;
     }
 
-    #banner-image {
-      height: 100%;
-      width: auto;
-      object-fit: contain;
-      object-position: left center;
-      display: none;
-    }
-
-    #banner-fallback {
+    #infobar-content {
       display: flex;
       align-items: flex-end;
       width: 100%;
@@ -49,7 +41,7 @@
       gap: 12px;
     }
 
-    #banner-icon {
+    #project-icon {
       width: 36px;
       height: 36px;
       border-radius: 8px;
@@ -62,19 +54,19 @@
       flex-shrink: 0;
     }
 
-    #banner-icon.has-icon {
+    #project-icon.has-icon {
       background: transparent !important;
       border-radius: 0;
     }
 
-    #banner-icon-img {
+    #project-icon-img {
       width: 100%;
       height: 100%;
       object-fit: contain;
       display: none;
     }
 
-    #banner-text {
+    #infobar-text {
       display: flex;
       flex-direction: column;
       overflow: hidden;
@@ -88,17 +80,17 @@
       gap: 5px;
     }
 
-    .banner-action {
+    .action-icon {
       cursor: pointer;
       opacity: 0.5;
       transition: opacity 0.15s;
       -webkit-app-region: no-drag;
       flex-shrink: 0;
     }
-    .banner-action:hover { opacity: 1; }
-    .banner-action svg { display: block; }
+    .action-icon:hover { opacity: 1; }
+    .action-icon svg { display: block; }
 
-    #banner-git {
+    #infobar-git {
       display: flex;
       align-items: flex-end;
       gap: 8px;
@@ -141,7 +133,7 @@
       text-overflow: ellipsis;
     }
 
-    /* Tab bar — macOS Terminal style */
+    /* Tab bar */
     #tab-bar {
       display: none;
       height: 30px;
@@ -213,8 +205,8 @@
     }
     #tab-filler-add:hover { opacity: 0.9; }
 
-    /* + button inline in banner when single tab */
-    #banner-add {
+    /* + button inline in infobar when single tab */
+    #infobar-add {
       cursor: pointer;
       opacity: 0.4;
       transition: opacity 0.15s;
@@ -222,7 +214,7 @@
       flex-shrink: 0;
       margin-left: 6px;
     }
-    #banner-add:hover { opacity: 0.8; }
+    #infobar-add:hover { opacity: 0.8; }
 
     /* Terminal container */
     #terminal-container {
@@ -258,16 +250,15 @@
         </div>
       </div>
     </div>
-    <div id="banner">
-      <img id="banner-image" />
-      <div id="banner-fallback">
-        <div id="banner-icon">
-          <img id="banner-icon-img" />
+    <div id="infobar">
+      <div id="infobar-content">
+        <div id="project-icon">
+          <img id="project-icon-img" />
         </div>
-        <div id="banner-text">
+        <div id="infobar-text">
           <div style="display:flex;align-items:center;">
             <div id="project-name">Terminal</div>
-            <span id="banner-add" title="New Tab">
+            <span id="infobar-add" title="New Tab">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
                 <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
               </svg>
@@ -275,14 +266,14 @@
           </div>
           <div id="project-path-row">
             <div id="project-path">~</div>
-            <span id="open-finder" class="banner-action" title="Open in Finder">
+            <span id="open-finder" class="action-icon" title="Open in Finder">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
               </svg>
             </span>
           </div>
         </div>
-        <div id="banner-git" style="display:none;">
+        <div id="infobar-git" style="display:none;">
           <span id="git-branch" style="display:flex;align-items:center;gap:3px;">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <line x1="6" y1="3" x2="6" y2="15"/>
@@ -323,19 +314,20 @@
     }
     function shortenPath(p) { return p.replace(/^\/Users\/[^/]+/, '~'); }
 
-    const TERM_THEME = {
-      background: '#1e1e2e', foreground: '#cdd6f4', cursor: '#f5e0dc',
-      selectionBackground: '#585b7066',
-      black: '#45475a', red: '#f38ba8', green: '#a6e3a1', yellow: '#f9e2af',
-      blue: '#89b4fa', magenta: '#cba6f7', cyan: '#89dceb', white: '#bac2de',
-      brightBlack: '#585b70', brightRed: '#f38ba8', brightGreen: '#a6e3a1',
-      brightYellow: '#f9e2af', brightBlue: '#89b4fa', brightMagenta: '#cba6f7',
-      brightCyan: '#89dceb', brightWhite: '#a6adc8',
+    // Default theme (overridden by main process via set-theme)
+    let TERM_THEME = {
+      background: '#000000', foreground: '#f7fbfc', cursor: '#f7fbfc',
+      selectionBackground: '#3e4d5b',
+      black: '#000000', red: '#c91b00', green: '#00c200', yellow: '#c7c400',
+      blue: '#0225c7', magenta: '#c930c7', cyan: '#00c5c7', white: '#c7c7c7',
+      brightBlack: '#686868', brightRed: '#ff6e67', brightGreen: '#5ffa68',
+      brightYellow: '#fffc67', brightBlue: '#6871ff', brightMagenta: '#ff76ff',
+      brightCyan: '#60fdff', brightWhite: '#ffffff',
     };
 
     // === Tab State ===
-    const tabs = new Map(); // tabId -> { terminal, fitAddon, container, tabButton, cwd, bannerPayload }
-    const tabOrder = []; // ordered tab IDs
+    const tabs = new Map(); // tabId -> { terminal, fitAddon, container, tabButton, titleSpan, cwd, projectInfo }
+    const tabOrder = [];
     let activeTabId = null;
     let currentFontSize = 13;
 
@@ -345,9 +337,7 @@
     function updateTabBarVisibility() {
       const multi = tabs.size > 1;
       tabBar.classList.toggle('visible', multi);
-      // Show + button in banner only when single tab
-      document.getElementById('banner-add').style.display = multi ? 'none' : '';
-      // Refit active terminal when tab bar shows/hides
+      document.getElementById('infobar-add').style.display = multi ? 'none' : '';
       setTimeout(() => {
         const active = tabs.get(activeTabId);
         if (active) {
@@ -358,35 +348,25 @@
     }
 
     function updateTabColors() {
-      let inactiveBg = '#313244';
-      let inactiveTextColor = '#cdd6f4';
       for (const [tid, tab] of tabs) {
-        if (!tab.tabButton || !tab.bannerPayload) continue;
-        const cfg = tab.bannerPayload.config;
+        if (!tab.tabButton || !tab.projectInfo) continue;
+        const cfg = tab.projectInfo.config;
         const hasConfig = cfg && cfg.color;
-        const bgColor = hasConfig ? cfg.color : hashColor(tab.bannerPayload.projectName);
+        const bgColor = hasConfig ? cfg.color : hashColor(tab.projectInfo.projectName);
         const light = isLightColor(bgColor);
         const isActive = tid === activeTabId;
         tab.tabButton.style.background = bgColor;
         tab.tabButton.style.color = light ? '#1e1e2e' : '#ffffff';
         tab.tabButton.style.opacity = isActive ? '1' : '0.9';
         tab.tabButton.style.filter = isActive ? 'none' : 'brightness(0.9)';
-        // Dim text on inactive tabs
-        const textOpacity = isActive ? '1' : '0.6';
-        if (tab.titleSpan) tab.titleSpan.style.opacity = textOpacity;
-        if (!isActive) {
-          inactiveBg = bgColor;
-          inactiveTextColor = light ? '#1e1e2e' : '#ffffff';
-        }
+        if (tab.titleSpan) tab.titleSpan.style.opacity = isActive ? '1' : '0.6';
       }
-      // Color the filler area like inactive tabs
       const filler = document.getElementById('tab-filler');
-      // Use the last inactive tab's color, or the active tab's color dimmed
       const activeTab = tabs.get(activeTabId);
-      if (activeTab && activeTab.bannerPayload) {
-        const cfg = activeTab.bannerPayload.config;
+      if (activeTab && activeTab.projectInfo) {
+        const cfg = activeTab.projectInfo.config;
         const hasConfig = cfg && cfg.color;
-        const bg = hasConfig ? cfg.color : hashColor(activeTab.bannerPayload.projectName);
+        const bg = hasConfig ? cfg.color : hashColor(activeTab.projectInfo.projectName);
         filler.style.background = bg;
         filler.style.opacity = '0.9';
         filler.style.filter = 'brightness(0.9)';
@@ -413,17 +393,15 @@
         window.terminalAPI.sendResize(tabId, tab.terminal.cols, tab.terminal.rows);
         tab.terminal.focus();
       }, 20);
-      if (tab.bannerPayload) updateBanner(tab.bannerPayload);
+      if (tab.projectInfo) updateInfobar(tab.projectInfo);
       updateTabColors();
     }
 
     function createTabUI(tabId, cwd, background) {
-      // Create terminal container
       const container = document.createElement('div');
       container.className = 'tab-terminal';
       terminalContainer.appendChild(container);
 
-      // Create xterm
       const terminal = new Terminal({
         fontFamily: '"SF Mono", "Menlo", "Monaco", "Courier New", monospace',
         fontSize: currentFontSize,
@@ -446,15 +424,13 @@
         window.terminalAPI.sendInput(tabId, data);
       });
 
-      // Tab bar button
       const tabButton = document.createElement('div');
       tabButton.className = 'tab-button';
       const titleSpan = document.createElement('span');
       titleSpan.className = 'tab-title';
-      titleSpan.textContent = 'Terminal';
       const closeBtn = document.createElement('span');
       closeBtn.className = 'tab-close';
-      closeBtn.textContent = '×';
+      closeBtn.textContent = '\u00d7';
       closeBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         window.terminalAPI.closeTab(tabId);
@@ -465,13 +441,13 @@
       const filler = document.getElementById('tab-filler');
       tabBar.insertBefore(tabButton, filler);
 
-      // Initialize with current active tab's banner if available
+      // Initialize with current active tab's info if available
       const existingActive = tabs.get(activeTabId);
-      const initialBanner = (existingActive && existingActive.bannerPayload) ? existingActive.bannerPayload : null;
+      const initialInfo = (existingActive && existingActive.projectInfo) ? existingActive.projectInfo : null;
       const initialTitle = (existingActive && existingActive.titleSpan) ? existingActive.titleSpan.textContent : 'Terminal';
       titleSpan.textContent = initialTitle;
 
-      const tabEntry = { terminal, fitAddon, container, tabButton, titleSpan, cwd, bannerPayload: initialBanner };
+      const tabEntry = { terminal, fitAddon, container, tabButton, titleSpan, cwd, projectInfo: initialInfo };
       tabs.set(tabId, tabEntry);
       tabOrder.push(tabId);
 
@@ -482,7 +458,6 @@
       updateTabBarVisibility();
       updateTabColors();
 
-      // Fit after visible
       setTimeout(() => {
         if (tabId === activeTabId) {
           fitAddon.fit();
@@ -502,20 +477,17 @@
       if (idx !== -1) tabOrder.splice(idx, 1);
 
       if (activeTabId === tabId && tabOrder.length > 0) {
-        // Switch to nearest tab
         const newIdx = Math.min(idx, tabOrder.length - 1);
         switchToTab(tabOrder[newIdx]);
       }
       updateTabBarVisibility();
     }
 
-    function updateBanner(payload) {
-      const { cwd, bannerData, iconData, projectName, config, gitInfo } = payload;
-      const banner = document.getElementById('banner');
-      const bannerImage = document.getElementById('banner-image');
-      const bannerFallback = document.getElementById('banner-fallback');
-      const bannerIcon = document.getElementById('banner-icon');
-      const bannerIconImg = document.getElementById('banner-icon-img');
+    function updateInfobar(payload) {
+      const { cwd, iconData, projectName, config, gitInfo } = payload;
+      const infobar = document.getElementById('infobar');
+      const icon = document.getElementById('project-icon');
+      const iconImg = document.getElementById('project-icon-img');
       const nameEl = document.getElementById('project-name');
       const pathEl = document.getElementById('project-path');
 
@@ -528,42 +500,34 @@
         ? config.textColor + 'aa'
         : (light ? 'rgba(30,30,46,0.6)' : 'rgba(255,255,255,0.7)');
 
-      banner.style.background = bgColor;
+      infobar.style.background = bgColor;
       nameEl.textContent = projectName;
       nameEl.style.color = textColor;
       pathEl.textContent = shortenPath(cwd);
       pathEl.style.color = subTextColor;
 
-      if (bannerData) {
-        bannerImage.src = bannerData;
-        bannerImage.style.display = 'block';
-        bannerFallback.style.display = 'none';
+      icon.childNodes.forEach(n => { if (n.nodeType === 3) n.remove(); });
+      if (iconData) {
+        iconImg.src = iconData;
+        iconImg.style.display = 'block';
+        icon.classList.add('has-icon');
       } else {
-        bannerImage.style.display = 'none';
-        bannerFallback.style.display = 'flex';
-        bannerIcon.childNodes.forEach(n => { if (n.nodeType === 3) n.remove(); });
-        if (iconData) {
-          bannerIconImg.src = iconData;
-          bannerIconImg.style.display = 'block';
-          bannerIcon.classList.add('has-icon');
-        } else {
-          bannerIconImg.style.display = 'none';
-          bannerIcon.classList.remove('has-icon');
-          bannerIcon.style.background = light ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.2)';
-          bannerIcon.style.color = light ? '#1e1e2e' : '#ffffff';
-          bannerIcon.style.fontSize = '16px';
-          bannerIcon.insertAdjacentText('afterbegin', projectName.charAt(0).toUpperCase());
-        }
+        iconImg.style.display = 'none';
+        icon.classList.remove('has-icon');
+        icon.style.background = light ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.2)';
+        icon.style.color = light ? '#1e1e2e' : '#ffffff';
+        icon.style.fontSize = '16px';
+        icon.insertAdjacentText('afterbegin', projectName.charAt(0).toUpperCase());
       }
 
       // Finder & add button
       const openFinderEl = document.getElementById('open-finder');
       openFinderEl.style.color = subTextColor;
-      document.getElementById('banner-add').style.color = subTextColor;
+      document.getElementById('infobar-add').style.color = subTextColor;
       openFinderEl.onclick = () => window.terminalAPI.openInFinder(cwd);
 
       // Git
-      const gitContainer = document.getElementById('banner-git');
+      const gitContainer = document.getElementById('infobar-git');
       const gitBranchEl = document.getElementById('git-branch');
       const gitLinkEl = document.getElementById('git-link');
       const gitLinkText = document.getElementById('git-link-text');
@@ -591,13 +555,13 @@
 
     // === IPC Handlers ===
 
-    window.terminalAPI.onTabCreated(({ tabId, cwd, background, banner }) => {
+    window.terminalAPI.onTabCreated(({ tabId, cwd, background, project }) => {
       createTabUI(tabId, cwd, background);
       const tab = tabs.get(tabId);
-      if (tab && banner) {
-        tab.bannerPayload = banner;
+      if (tab && project) {
+        tab.projectInfo = project;
         updateTabColors();
-        if (tabId === activeTabId) updateBanner(banner);
+        if (tabId === activeTabId) updateInfobar(project);
       }
     });
 
@@ -614,12 +578,12 @@
       if (tab) tab.terminal.write(data);
     });
 
-    window.terminalAPI.onBannerUpdate((tabId, payload) => {
+    window.terminalAPI.onProjectUpdate((tabId, payload) => {
       const tab = tabs.get(tabId);
       if (tab) {
-        tab.bannerPayload = payload;
+        tab.projectInfo = payload;
         if (tabId === activeTabId) {
-          updateBanner(payload);
+          updateInfobar(payload);
           updateTabColors();
         }
       }
@@ -669,7 +633,6 @@
     window.terminalAPI.onSwitchTab((target) => {
       if (tabOrder.length <= 1) return;
       if (typeof target === 'number') {
-        // Index-based (0-8)
         if (target < tabOrder.length) switchToTab(tabOrder[target]);
       } else if (target === 'next') {
         const idx = tabOrder.indexOf(activeTabId);
@@ -688,12 +651,22 @@
       if (activeTabId) window.terminalAPI.closeTab(activeTabId);
     });
 
-    // Plus buttons (in banner + in tab bar filler)
-    document.getElementById('banner-add').addEventListener('click', () => {
+    // Plus buttons
+    document.getElementById('infobar-add').addEventListener('click', () => {
       window.terminalAPI.createTab({});
     });
     document.getElementById('tab-filler-add').addEventListener('click', () => {
       window.terminalAPI.createTab({});
+    });
+
+    // Theme from main process
+    window.terminalAPI.onSetTheme((theme) => {
+      TERM_THEME = theme;
+      document.body.style.background = theme.background;
+      document.getElementById('app').style.background = theme.background;
+      for (const [tid, tab] of tabs) {
+        tab.terminal.options.theme = theme;
+      }
     });
 
     // Boot

@@ -1,0 +1,83 @@
+#!/bin/bash
+# Mantel — Terminal Wrapper
+# Usage:
+#   mantel                              - Open in current directory
+#   mantel /path/to/project             - Open in specific directory
+#   mantel init                         - Initialize .mantel/ in current directory
+#   mantel init --color "#1a56db"       - Set project color
+#   mantel init --icon ../favicon.png   - Set project icon
+#   mantel init --name "My Project"     - Set project name
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+if [ "$1" = "init" ]; then
+  shift
+  PROJECT_DIR="."
+  COLOR=""
+  ICON=""
+  NAME=""
+
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --color) COLOR="$2"; shift 2 ;;
+      --icon) ICON="$2"; shift 2 ;;
+      --name) NAME="$2"; shift 2 ;;
+      --dir) PROJECT_DIR="$2"; shift 2 ;;
+      *) echo "Unknown option: $1"; exit 1 ;;
+    esac
+  done
+
+  PROJECT_DIR="$(cd "$PROJECT_DIR" && pwd)"
+  MANTEL_DIR="$PROJECT_DIR/.mantel"
+  mkdir -p "$MANTEL_DIR"
+
+  # Copy icon if provided
+  if [ -n "$ICON" ]; then
+    if [ ! -f "$ICON" ]; then
+      echo "Error: Icon file '$ICON' not found"
+      exit 1
+    fi
+    EXT="${ICON##*.}"
+    cp "$ICON" "$MANTEL_DIR/icon.${EXT}"
+    echo "Icon set: $MANTEL_DIR/icon.${EXT}"
+  fi
+
+  # Build or update config.json
+  CONFIG="$MANTEL_DIR/config.json"
+  if [ -f "$CONFIG" ]; then
+    # Merge with existing config
+    EXISTING=$(cat "$CONFIG")
+  else
+    EXISTING="{}"
+  fi
+
+  # Use python3 to merge JSON (available on macOS)
+  python3 -c "
+import json, sys
+config = json.loads('''$EXISTING''')
+color = '''$COLOR'''
+name = '''$NAME'''
+if color: config['color'] = color
+if name: config['name'] = name
+if not config.get('name'):
+    import os
+    config['name'] = os.path.basename('''$PROJECT_DIR''')
+json.dump(config, sys.stdout, indent=2)
+print()
+" > "$CONFIG.tmp" && mv "$CONFIG.tmp" "$CONFIG"
+
+  echo "Initialized: $MANTEL_DIR/"
+  cat "$CONFIG"
+  exit 0
+fi
+
+TARGET_DIR="${1:-.}"
+TARGET_DIR="$(cd "$TARGET_DIR" 2>/dev/null && pwd)"
+
+if [ -z "$TARGET_DIR" ]; then
+  echo "Error: Directory '$1' not found"
+  exit 1
+fi
+
+cd "$SCRIPT_DIR" && npm start -- "$TARGET_DIR" 2>/dev/null &
+disown

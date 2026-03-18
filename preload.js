@@ -15,13 +15,16 @@ contextBridge.exposeInMainWorld('terminalAPI', {
   sendInput: (tabId, data) => ipcRenderer.send('terminal-input', tabId, data),
   sendResize: (tabId, cols, rows) => ipcRenderer.send('terminal-resize', tabId, cols, rows),
 
-  // Banner (per tab)
-  onBannerUpdate: (cb) => ipcRenderer.on('update-banner', (_e, tabId, payload) => cb(tabId, payload)),
+  // Project info (per tab)
+  onProjectUpdate: (cb) => ipcRenderer.on('update-project', (_e, tabId, payload) => cb(tabId, payload)),
 
   // Window-level
   setTitle: (title) => ipcRenderer.send('set-title', title),
   openExternal: (url) => ipcRenderer.send('open-external', url),
   openInFinder: (dirPath) => ipcRenderer.send('open-in-finder', dirPath),
+
+  // Theme
+  onSetTheme: (cb) => ipcRenderer.on('set-theme', (_e, theme) => cb(theme)),
 
   // Menu actions
   onMenuCopy: (cb) => ipcRenderer.on('menu-copy', () => cb()),

@@ -35,14 +35,13 @@ Classic Electron main/renderer split across three files:
 
 ### Directory Change Detection
 
-Per-tab polling every 2s using `lsof -p <pid> -Fn` on macOS to get the shell's current working directory. When it changes, it re-discovers the nearest `.mantel/` config and pushes an `update-banner` event. Also detects SSH sessions via child process inspection.
+Per-tab polling every 2s using `lsof -p <pid> -Fn` on macOS to get the shell's current working directory. When it changes, it re-discovers the nearest `.mantel/` config and pushes an `update-project` event. Also detects SSH sessions via child process inspection.
 
 ### Project Customization
 
 Projects opt in by creating a `.mantel/` directory containing:
 - `config.json` — Optional: `{ name, color, textColor }`
-- `banner.*` (png/jpg/gif/webp/svg) — Full-width banner image
-- `icon.*` — Project icon (falls back to auto-generated initial with hashed color)
+- `icon.*` (png/jpg/gif/webp/svg) — Project icon (falls back to auto-generated initial with hashed color)
 
 ## Key Dependencies
 

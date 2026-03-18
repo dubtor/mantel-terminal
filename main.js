@@ -13,6 +13,52 @@ const windows = new Map();
 let nextTabId = 1;
 
 const TERMINAL_DIR = '.mantel';
+const MANTEL_HOME = path.join(process.env.HOME || '', '.mantel');
+
+// Built-in themes
+const THEMES = {
+  'default': {
+    background: '#000000',
+    foreground: '#f7fbfc',
+    cursor: '#f7fbfc',
+    selectionBackground: '#3e4d5b',
+    black: '#000000', red: '#c91b00', green: '#00c200', yellow: '#c7c400',
+    blue: '#0225c7', magenta: '#c930c7', cyan: '#00c5c7', white: '#c7c7c7',
+    brightBlack: '#686868', brightRed: '#ff6e67', brightGreen: '#5ffa68',
+    brightYellow: '#fffc67', brightBlue: '#6871ff', brightMagenta: '#ff76ff',
+    brightCyan: '#60fdff', brightWhite: '#ffffff',
+  },
+  'catppuccin': {
+    background: '#1e1e2e', foreground: '#cdd6f4', cursor: '#f5e0dc',
+    selectionBackground: '#585b7066',
+    black: '#45475a', red: '#f38ba8', green: '#a6e3a1', yellow: '#f9e2af',
+    blue: '#89b4fa', magenta: '#cba6f7', cyan: '#89dceb', white: '#bac2de',
+    brightBlack: '#585b70', brightRed: '#f38ba8', brightGreen: '#a6e3a1',
+    brightYellow: '#f9e2af', brightBlue: '#89b4fa', brightMagenta: '#cba6f7',
+    brightCyan: '#89dceb', brightWhite: '#a6adc8',
+  },
+};
+
+function loadTheme() {
+  const themePath = path.join(MANTEL_HOME, 'theme.json');
+  try {
+    if (fs.existsSync(themePath)) {
+      const data = JSON.parse(fs.readFileSync(themePath, 'utf8'));
+      // If it's a string, treat as preset name
+      if (typeof data === 'string') return THEMES[data] || THEMES['default'];
+      // If it has a "preset" key, merge preset with overrides
+      if (data.preset && THEMES[data.preset]) {
+        const { preset, ...overrides } = data;
+        return { ...THEMES[preset], ...overrides };
+      }
+      // Otherwise it's a full custom theme — merge with default as base
+      return { ...THEMES['default'], ...data };
+    }
+  } catch (_e) { /* ignore */ }
+  return THEMES['default'];
+}
+
+const terminalTheme = loadTheme();
 const IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg'];
 
 function detectGitInfo(cwd) {
@@ -46,11 +92,6 @@ function findProjectConfig(cwd) {
       if (fs.existsSync(configPath)) {
         try { config = JSON.parse(fs.readFileSync(configPath, 'utf8')); } catch (_e) { /* */ }
       }
-      let bannerPath = null;
-      for (const ext of IMAGE_EXTENSIONS) {
-        const p = path.join(terminalDir, 'banner' + ext);
-        if (fs.existsSync(p)) { bannerPath = p; break; }
-      }
       let iconPath = null;
       for (const ext of IMAGE_EXTENSIONS) {
         const p = path.join(terminalDir, 'icon' + ext);
@@ -58,7 +99,6 @@ function findProjectConfig(cwd) {
       }
       return {
         config,
-        bannerData: bannerPath ? fileToDataURL(bannerPath) : null,
         iconData: iconPath ? fileToDataURL(iconPath) : null,
         iconPath,
         projectRoot: dir,
@@ -66,7 +106,7 @@ function findProjectConfig(cwd) {
     }
     dir = path.dirname(dir);
   }
-  return { config: {}, bannerData: null, iconData: null, iconPath: null, projectRoot: null };
+  return { config: {}, iconData: null, iconPath: null, projectRoot: null };
 }
 
 function fileToDataURL(filePath) {
@@ -96,15 +136,7 @@ function hashColor(str) {
   return COLORS[Math.abs(hash) % COLORS.length];
 }
 
-function buildBaseTerminalSvg(size) {
-  return `<svg width="${size}" height="${size}" xmlns="http://www.w3.org/2000/svg">
-    <rect width="${size}" height="${size}" rx="112" ry="112" fill="#1e1e2e"/>
-    <rect x="60" y="60" width="${size - 120}" height="${size - 120}" rx="40" ry="40" fill="#313244"/>
-    <text x="50%" y="53%" dominant-baseline="middle" text-anchor="middle"
-          font-family="SF Mono, Menlo, Monaco, monospace"
-          font-size="240" font-weight="700" fill="#ffffff">&gt;</text>
-  </svg>`;
-}
+const BASE_ICON_PATH = path.join(__dirname, 'icon.png');
 
 async function updateDockIcon(projectName, config, iconPath, emoji) {
   if (process.platform !== 'darwin') return;
@@ -118,8 +150,9 @@ async function updateDockIcon(projectName, config, iconPath, emoji) {
     const badgeLeft = canvasSize - badgeSize - 8;
     const badgeTop = canvasSize - badgeSize - 8;
 
-    const baseSvg = buildBaseTerminalSvg(baseSize);
-    const baseBuffer = await sharp(Buffer.from(baseSvg)).png().toBuffer();
+    const baseBuffer = await sharp(BASE_ICON_PATH)
+      .resize(baseSize, baseSize)
+      .png().toBuffer();
 
     let badgeBuffer;
     if (iconPath) {
@@ -236,9 +269,9 @@ function getStartDir() {
   }) || process.env.HOME || process.cwd();
 }
 
-// Build banner payload for a given cwd
-function buildBannerPayload(cwd) {
-  const { config, bannerData, iconData, iconPath, projectRoot } = findProjectConfig(cwd);
+// Build project info payload for a given cwd
+function buildProjectPayload(cwd) {
+  const { config, iconData, iconPath, projectRoot } = findProjectConfig(cwd);
   const special = getSpecialDir(cwd);
   const displayRoot = projectRoot || cwd;
   const projectName = (special && !projectRoot) ? special.name : (config.name || path.basename(displayRoot));
@@ -250,7 +283,7 @@ function buildBannerPayload(cwd) {
     if (svg) finalIconData = `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`;
   }
   const gitInfo = detectGitInfo(cwd);
-  return { cwd, bannerData, iconData: finalIconData, projectName, config, gitInfo, iconPath, specialIcon };
+  return { cwd, iconData: finalIconData, projectName, config, gitInfo, iconPath, specialIcon };
 }
 
 // Get cwd of a tab's PTY
@@ -307,8 +340,8 @@ function createTab(windowId, cwd, opts = {}) {
           const iconColor = light ? '#1e1e2e' : '#ffffff';
           const svg = buildSpecialDirIconSvg('ssh', 24, iconColor);
           const sshIconData = svg ? `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}` : null;
-          entry.window.webContents.send('update-banner', tabId, {
-            cwd: displayName, bannerData: null, iconData: sshIconData,
+          entry.window.webContents.send('update-project', tabId, {
+            cwd: displayName, iconData: sshIconData,
             projectName: sshInfo.host, config: sshConfig, gitInfo: null,
           });
           if (entry.activeTabId === tabId && entry.window.isFocused()) {
@@ -326,9 +359,9 @@ function createTab(windowId, cwd, opts = {}) {
 
       if (detectedCwd !== lastCwd && fs.existsSync(detectedCwd)) {
         lastCwd = detectedCwd;
-        const payload = buildBannerPayload(detectedCwd);
-        entry.window.webContents.send('update-banner', tabId, {
-          cwd: payload.cwd, bannerData: payload.bannerData, iconData: payload.iconData,
+        const payload = buildProjectPayload(detectedCwd);
+        entry.window.webContents.send('update-project', tabId, {
+          cwd: payload.cwd, iconData: payload.iconData,
           projectName: payload.projectName, config: payload.config, gitInfo: payload.gitInfo,
         });
         // Update tab title
@@ -351,12 +384,12 @@ function createTab(windowId, cwd, opts = {}) {
     entry.activeTabId = tabId;
   }
 
-  // Send initial banner
-  const payload = buildBannerPayload(cwd);
+  // Send initial project info
+  const payload = buildProjectPayload(cwd);
   entry.window.webContents.send('tab-created', {
     tabId, cwd, background: !!opts.background,
-    banner: {
-      cwd: payload.cwd, bannerData: payload.bannerData, iconData: payload.iconData,
+    project: {
+      cwd: payload.cwd, iconData: payload.iconData,
       projectName: payload.projectName, config: payload.config, gitInfo: payload.gitInfo,
     },
   });
@@ -405,7 +438,7 @@ function createWindow(startDir) {
     minWidth: 400,
     minHeight: 300,
     titleBarStyle: 'default',
-    backgroundColor: '#1e1e2e',
+    backgroundColor: terminalTheme.background,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -436,6 +469,8 @@ ipcMain.on('terminal-ready', (event) => {
   const win = BrowserWindow.fromWebContents(event.sender);
   const entry = windows.get(win.id);
   if (!entry) return;
+  // Send theme before creating the first tab
+  win.webContents.send('set-theme', terminalTheme);
   createTab(win.id, entry.startDir);
 });
 
@@ -482,7 +517,7 @@ ipcMain.on('set-active-tab', (event, tabId) => {
   const tab = entry.tabs.get(tabId);
   if (tab) {
     const cwd = getTabCwd(tab) || tab.startDir;
-    const payload = buildBannerPayload(cwd);
+    const payload = buildProjectPayload(cwd);
     updateDockIcon(payload.projectName, payload.config, payload.iconPath, payload.specialIcon);
     updateMenuForDirectory(cwd);
   }
