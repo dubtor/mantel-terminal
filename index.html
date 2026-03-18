@@ -5,11 +5,7 @@
   <title>Wrapped Terminal</title>
   <link rel="stylesheet" href="node_modules/@xterm/xterm/css/xterm.css">
   <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
 
     html, body {
       height: 100%;
@@ -22,14 +18,6 @@
       display: flex;
       flex-direction: column;
       height: 100%;
-    }
-
-    /* Draggable title bar area */
-    #titlebar {
-      -webkit-app-region: drag;
-      height: 28px;
-      min-height: 28px;
-      background: #1e1e2e;
     }
 
     /* Project banner */
@@ -79,10 +67,6 @@
       border-radius: 0;
     }
 
-    .has-color #project-path {
-      color: rgba(255,255,255,0.7);
-    }
-
     #banner-icon-img {
       width: 100%;
       height: 100%;
@@ -111,14 +95,8 @@
       -webkit-app-region: no-drag;
       flex-shrink: 0;
     }
-
-    .banner-action:hover {
-      opacity: 1;
-    }
-
-    .banner-action svg {
-      display: block;
-    }
+    .banner-action:hover { opacity: 1; }
+    .banner-action svg { display: block; }
 
     #banner-git {
       display: flex;
@@ -133,9 +111,7 @@
       white-space: nowrap;
     }
 
-    #git-branch {
-      opacity: 0.7;
-    }
+    #git-branch { opacity: 0.7; }
 
     #git-link {
       display: flex;
@@ -146,11 +122,7 @@
       transition: opacity 0.15s;
       -webkit-app-region: no-drag;
     }
-
-    #git-link:hover {
-      opacity: 1;
-      text-decoration: underline;
-    }
+    #git-link:hover { opacity: 1; text-decoration: underline; }
 
     #project-name {
       font-size: 14px;
@@ -169,33 +141,123 @@
       text-overflow: ellipsis;
     }
 
+    /* Tab bar — macOS Terminal style */
+    #tab-bar {
+      display: none;
+      height: 30px;
+      min-height: 30px;
+      align-items: stretch;
+      overflow-x: auto;
+      -webkit-app-region: drag;
+    }
+
+    #tab-bar::-webkit-scrollbar { display: none; }
+
+    #tab-bar.visible { display: flex; }
+
+    .tab-button {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 0 14px;
+      font-size: 11px;
+      font-weight: 500;
+      cursor: pointer;
+      white-space: nowrap;
+      flex-shrink: 0;
+      -webkit-app-region: no-drag;
+      transition: filter 0.15s;
+      border-right: 1px solid rgba(0,0,0,0.15);
+    }
+
+    .tab-title {
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .tab-close {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 16px;
+      height: 16px;
+      border-radius: 4px;
+      font-size: 12px;
+      line-height: 1;
+      opacity: 0;
+      flex-shrink: 0;
+      transition: opacity 0.1s, background 0.1s;
+    }
+    .tab-button:hover .tab-close { opacity: 0.5; }
+    .tab-close:hover { opacity: 1 !important; background: rgba(0,0,0,0.15); }
+
+    #tab-filler {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      padding-left: 10px;
+      min-width: 40px;
+    }
+
+    #tab-filler-add {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 22px;
+      height: 22px;
+      border-radius: 4px;
+      cursor: pointer;
+      opacity: 0.5;
+      -webkit-app-region: no-drag;
+      transition: opacity 0.1s;
+    }
+    #tab-filler-add:hover { opacity: 0.9; }
+
+    /* + button inline in banner when single tab */
+    #banner-add {
+      cursor: pointer;
+      opacity: 0.4;
+      transition: opacity 0.15s;
+      -webkit-app-region: no-drag;
+      flex-shrink: 0;
+      margin-left: 6px;
+    }
+    #banner-add:hover { opacity: 0.8; }
+
     /* Terminal container */
     #terminal-container {
       flex: 1;
-      padding: 4px 4px 4px 8px;
+      position: relative;
       overflow: hidden;
     }
 
-    #terminal-container .xterm {
-      height: 100%;
+    .tab-terminal {
+      position: absolute;
+      inset: 0;
+      padding: 4px 4px 4px 8px;
+      display: none;
     }
 
-    .xterm-viewport::-webkit-scrollbar {
-      width: 8px;
-    }
+    .tab-terminal.active { display: block; }
 
-    .xterm-viewport::-webkit-scrollbar-track {
-      background: transparent;
-    }
+    .tab-terminal .xterm { height: 100%; }
 
-    .xterm-viewport::-webkit-scrollbar-thumb {
-      background: #45475a;
-      border-radius: 4px;
-    }
+    .xterm-viewport::-webkit-scrollbar { width: 8px; }
+    .xterm-viewport::-webkit-scrollbar-track { background: transparent; }
+    .xterm-viewport::-webkit-scrollbar-thumb { background: #45475a; border-radius: 4px; }
   </style>
 </head>
 <body>
   <div id="app">
+    <div id="tab-bar">
+      <div id="tab-filler">
+        <div id="tab-filler-add" title="New Tab">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+            <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+          </svg>
+        </div>
+      </div>
+    </div>
     <div id="banner">
       <img id="banner-image" />
       <div id="banner-fallback">
@@ -203,7 +265,14 @@
           <img id="banner-icon-img" />
         </div>
         <div id="banner-text">
-          <div id="project-name">Terminal</div>
+          <div style="display:flex;align-items:center;">
+            <div id="project-name">Terminal</div>
+            <span id="banner-add" title="New Tab">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+              </svg>
+            </span>
+          </div>
           <div id="project-path-row">
             <div id="project-path">~</div>
             <span id="open-finder" class="banner-action" title="Open in Finder">
@@ -238,98 +307,209 @@
   <script src="node_modules/@xterm/xterm/lib/xterm.js"></script>
   <script src="node_modules/@xterm/addon-fit/lib/addon-fit.js"></script>
   <script>
-    // Color palette for fallback project icons
     const COLORS = [
       '#f38ba8', '#fab387', '#f9e2af', '#a6e3a1',
       '#89dceb', '#74c7ec', '#89b4fa', '#b4befe',
       '#cba6f7', '#f5c2e7', '#eba0ac', '#94e2d5',
     ];
-
     function hashColor(str) {
       let hash = 0;
-      for (let i = 0; i < str.length; i++) {
-        hash = str.charCodeAt(i) + ((hash << 5) - hash);
-      }
+      for (let i = 0; i < str.length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash);
       return COLORS[Math.abs(hash) % COLORS.length];
     }
-
-    // Returns true if the color is light (needs dark text)
     function isLightColor(hex) {
-      const r = parseInt(hex.slice(1, 3), 16);
-      const g = parseInt(hex.slice(3, 5), 16);
-      const b = parseInt(hex.slice(5, 7), 16);
-      // Relative luminance
-      const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-      return luminance > 0.6;
+      const r = parseInt(hex.slice(1, 3), 16), g = parseInt(hex.slice(3, 5), 16), b = parseInt(hex.slice(5, 7), 16);
+      return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.6;
+    }
+    function shortenPath(p) { return p.replace(/^\/Users\/[^/]+/, '~'); }
+
+    const TERM_THEME = {
+      background: '#1e1e2e', foreground: '#cdd6f4', cursor: '#f5e0dc',
+      selectionBackground: '#585b7066',
+      black: '#45475a', red: '#f38ba8', green: '#a6e3a1', yellow: '#f9e2af',
+      blue: '#89b4fa', magenta: '#cba6f7', cyan: '#89dceb', white: '#bac2de',
+      brightBlack: '#585b70', brightRed: '#f38ba8', brightGreen: '#a6e3a1',
+      brightYellow: '#f9e2af', brightBlue: '#89b4fa', brightMagenta: '#cba6f7',
+      brightCyan: '#89dceb', brightWhite: '#a6adc8',
+    };
+
+    // === Tab State ===
+    const tabs = new Map(); // tabId -> { terminal, fitAddon, container, tabButton, cwd, bannerPayload }
+    const tabOrder = []; // ordered tab IDs
+    let activeTabId = null;
+    let currentFontSize = 13;
+
+    const tabBar = document.getElementById('tab-bar');
+    const terminalContainer = document.getElementById('terminal-container');
+
+    function updateTabBarVisibility() {
+      const multi = tabs.size > 1;
+      tabBar.classList.toggle('visible', multi);
+      // Show + button in banner only when single tab
+      document.getElementById('banner-add').style.display = multi ? 'none' : '';
+      // Refit active terminal when tab bar shows/hides
+      setTimeout(() => {
+        const active = tabs.get(activeTabId);
+        if (active) {
+          active.fitAddon.fit();
+          window.terminalAPI.sendResize(activeTabId, active.terminal.cols, active.terminal.rows);
+        }
+      }, 50);
     }
 
-    function shortenPath(fullPath) {
-      const home = fullPath.replace(/^\/Users\/[^/]+/, '~');
-      return home;
+    function updateTabColors() {
+      let inactiveBg = '#313244';
+      let inactiveTextColor = '#cdd6f4';
+      for (const [tid, tab] of tabs) {
+        if (!tab.tabButton || !tab.bannerPayload) continue;
+        const cfg = tab.bannerPayload.config;
+        const hasConfig = cfg && cfg.color;
+        const bgColor = hasConfig ? cfg.color : hashColor(tab.bannerPayload.projectName);
+        const light = isLightColor(bgColor);
+        const isActive = tid === activeTabId;
+        tab.tabButton.style.background = bgColor;
+        tab.tabButton.style.color = light ? '#1e1e2e' : '#ffffff';
+        tab.tabButton.style.opacity = isActive ? '1' : '0.9';
+        tab.tabButton.style.filter = isActive ? 'none' : 'brightness(0.9)';
+        // Dim text on inactive tabs
+        const textOpacity = isActive ? '1' : '0.6';
+        if (tab.titleSpan) tab.titleSpan.style.opacity = textOpacity;
+        if (!isActive) {
+          inactiveBg = bgColor;
+          inactiveTextColor = light ? '#1e1e2e' : '#ffffff';
+        }
+      }
+      // Color the filler area like inactive tabs
+      const filler = document.getElementById('tab-filler');
+      // Use the last inactive tab's color, or the active tab's color dimmed
+      const activeTab = tabs.get(activeTabId);
+      if (activeTab && activeTab.bannerPayload) {
+        const cfg = activeTab.bannerPayload.config;
+        const hasConfig = cfg && cfg.color;
+        const bg = hasConfig ? cfg.color : hashColor(activeTab.bannerPayload.projectName);
+        filler.style.background = bg;
+        filler.style.opacity = '0.9';
+        filler.style.filter = 'brightness(0.9)';
+        const light = isLightColor(bg);
+        document.getElementById('tab-filler-add').style.color = light ? '#1e1e2e' : '#ffffff';
+      }
     }
 
-    // Setup terminal
-    const terminal = new Terminal({
-      fontFamily: '"SF Mono", "Menlo", "Monaco", "Courier New", monospace',
-      fontSize: 13,
-      lineHeight: 1.2,
-      theme: {
-        background: '#1e1e2e',
-        foreground: '#cdd6f4',
-        cursor: '#f5e0dc',
-        selectionBackground: '#585b7066',
-        black: '#45475a',
-        red: '#f38ba8',
-        green: '#a6e3a1',
-        yellow: '#f9e2af',
-        blue: '#89b4fa',
-        magenta: '#cba6f7',
-        cyan: '#89dceb',
-        white: '#bac2de',
-        brightBlack: '#585b70',
-        brightRed: '#f38ba8',
-        brightGreen: '#a6e3a1',
-        brightYellow: '#f9e2af',
-        brightBlue: '#89b4fa',
-        brightMagenta: '#cba6f7',
-        brightCyan: '#89dceb',
-        brightWhite: '#a6adc8',
-      },
-      cursorBlink: true,
-      allowProposedApi: true,
-    });
+    function switchToTab(tabId) {
+      if (tabId === activeTabId) return;
+      const prev = tabs.get(activeTabId);
+      if (prev) {
+        prev.container.classList.remove('active');
+        if (prev.tabButton) prev.tabButton.classList.remove('active');
+      }
+      activeTabId = tabId;
+      const tab = tabs.get(tabId);
+      if (!tab) return;
+      tab.container.classList.add('active');
+      if (tab.tabButton) tab.tabButton.classList.add('active');
+      window.terminalAPI.setActiveTab(tabId);
+      setTimeout(() => {
+        tab.fitAddon.fit();
+        window.terminalAPI.sendResize(tabId, tab.terminal.cols, tab.terminal.rows);
+        tab.terminal.focus();
+      }, 20);
+      if (tab.bannerPayload) updateBanner(tab.bannerPayload);
+      updateTabColors();
+    }
 
-    const fitAddon = new FitAddon.FitAddon();
-    terminal.loadAddon(fitAddon);
+    function createTabUI(tabId, cwd, background) {
+      // Create terminal container
+      const container = document.createElement('div');
+      container.className = 'tab-terminal';
+      terminalContainer.appendChild(container);
 
-    const container = document.getElementById('terminal-container');
-    terminal.open(container);
-    fitAddon.fit();
+      // Create xterm
+      const terminal = new Terminal({
+        fontFamily: '"SF Mono", "Menlo", "Monaco", "Courier New", monospace',
+        fontSize: currentFontSize,
+        lineHeight: 1.2,
+        theme: TERM_THEME,
+        cursorBlink: true,
+        allowProposedApi: true,
+      });
+      const fitAddon = new FitAddon.FitAddon();
+      terminal.loadAddon(fitAddon);
+      terminal.open(container);
 
-    // Forward title changes from shell (OSC sequences) to window title
-    terminal.onTitleChange((title) => {
-      window.terminalAPI.setTitle(title);
-    });
+      terminal.onTitleChange((title) => {
+        if (tabId === activeTabId) window.terminalAPI.setTitle(title);
+        const t = tabs.get(tabId);
+        if (t && t.titleSpan) t.titleSpan.textContent = title;
+      });
 
-    // Handle input/output
-    terminal.onData((data) => {
-      window.terminalAPI.sendInput(data);
-    });
+      terminal.onData((data) => {
+        window.terminalAPI.sendInput(tabId, data);
+      });
 
-    window.terminalAPI.onData((data) => {
-      terminal.write(data);
-    });
+      // Tab bar button
+      const tabButton = document.createElement('div');
+      tabButton.className = 'tab-button';
+      const titleSpan = document.createElement('span');
+      titleSpan.className = 'tab-title';
+      titleSpan.textContent = 'Terminal';
+      const closeBtn = document.createElement('span');
+      closeBtn.className = 'tab-close';
+      closeBtn.textContent = '×';
+      closeBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        window.terminalAPI.closeTab(tabId);
+      });
+      tabButton.appendChild(titleSpan);
+      tabButton.appendChild(closeBtn);
+      tabButton.addEventListener('click', () => switchToTab(tabId));
+      const filler = document.getElementById('tab-filler');
+      tabBar.insertBefore(tabButton, filler);
 
-    // Handle resize
-    const resizeObserver = new ResizeObserver(() => {
-      fitAddon.fit();
-      window.terminalAPI.sendResize(terminal.cols, terminal.rows);
-    });
-    resizeObserver.observe(container);
+      // Initialize with current active tab's banner if available
+      const existingActive = tabs.get(activeTabId);
+      const initialBanner = (existingActive && existingActive.bannerPayload) ? existingActive.bannerPayload : null;
+      const initialTitle = (existingActive && existingActive.titleSpan) ? existingActive.titleSpan.textContent : 'Terminal';
+      titleSpan.textContent = initialTitle;
 
-    // Handle banner updates
-    window.terminalAPI.onBannerUpdate((payload) => {
-      console.log('BANNER PAYLOAD:', JSON.stringify({ hasIcon: !!payload.iconData, hasBanner: !!payload.bannerData, name: payload.projectName }));
+      const tabEntry = { terminal, fitAddon, container, tabButton, titleSpan, cwd, bannerPayload: initialBanner };
+      tabs.set(tabId, tabEntry);
+      tabOrder.push(tabId);
+
+      if (!background || tabs.size === 1) {
+        switchToTab(tabId);
+      }
+
+      updateTabBarVisibility();
+      updateTabColors();
+
+      // Fit after visible
+      setTimeout(() => {
+        if (tabId === activeTabId) {
+          fitAddon.fit();
+          window.terminalAPI.sendResize(tabId, terminal.cols, terminal.rows);
+        }
+      }, 50);
+    }
+
+    function removeTabUI(tabId) {
+      const tab = tabs.get(tabId);
+      if (!tab) return;
+      tab.terminal.dispose();
+      tab.container.remove();
+      if (tab.tabButton) tab.tabButton.remove();
+      tabs.delete(tabId);
+      const idx = tabOrder.indexOf(tabId);
+      if (idx !== -1) tabOrder.splice(idx, 1);
+
+      if (activeTabId === tabId && tabOrder.length > 0) {
+        // Switch to nearest tab
+        const newIdx = Math.min(idx, tabOrder.length - 1);
+        switchToTab(tabOrder[newIdx]);
+      }
+      updateTabBarVisibility();
+    }
+
+    function updateBanner(payload) {
       const { cwd, bannerData, iconData, projectName, config, gitInfo } = payload;
       const banner = document.getElementById('banner');
       const bannerImage = document.getElementById('banner-image');
@@ -339,7 +519,6 @@
       const nameEl = document.getElementById('project-name');
       const pathEl = document.getElementById('project-path');
 
-      // Determine banner background color and auto-detect text color
       const hasConfig = config && config.color;
       const fallbackColor = hashColor(projectName);
       const bgColor = hasConfig ? config.color : fallbackColor;
@@ -350,8 +529,6 @@
         : (light ? 'rgba(30,30,46,0.6)' : 'rgba(255,255,255,0.7)');
 
       banner.style.background = bgColor;
-      banner.classList.add('has-color');
-
       nameEl.textContent = projectName;
       nameEl.style.color = textColor;
       pathEl.textContent = shortenPath(cwd);
@@ -364,10 +541,7 @@
       } else {
         bannerImage.style.display = 'none';
         bannerFallback.style.display = 'flex';
-
-        // Clear any text nodes without destroying the <img> element
         bannerIcon.childNodes.forEach(n => { if (n.nodeType === 3) n.remove(); });
-
         if (iconData) {
           bannerIconImg.src = iconData;
           bannerIconImg.style.display = 'block';
@@ -375,20 +549,20 @@
         } else {
           bannerIconImg.style.display = 'none';
           bannerIcon.classList.remove('has-icon');
-          const initial = projectName.charAt(0).toUpperCase();
           bannerIcon.style.background = light ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.2)';
           bannerIcon.style.color = light ? '#1e1e2e' : '#ffffff';
           bannerIcon.style.fontSize = '16px';
-          bannerIcon.insertAdjacentText('afterbegin', initial);
+          bannerIcon.insertAdjacentText('afterbegin', projectName.charAt(0).toUpperCase());
         }
       }
 
-      // Finder button
+      // Finder & add button
       const openFinderEl = document.getElementById('open-finder');
       openFinderEl.style.color = subTextColor;
+      document.getElementById('banner-add').style.color = subTextColor;
       openFinderEl.onclick = () => window.terminalAPI.openInFinder(cwd);
 
-      // Git info
+      // Git
       const gitContainer = document.getElementById('banner-git');
       const gitBranchEl = document.getElementById('git-branch');
       const gitLinkEl = document.getElementById('git-link');
@@ -413,41 +587,116 @@
       } else {
         gitContainer.style.display = 'none';
       }
+    }
 
-      // Re-fit terminal after banner change
-      setTimeout(() => {
-        fitAddon.fit();
-        window.terminalAPI.sendResize(terminal.cols, terminal.rows);
-      }, 50);
+    // === IPC Handlers ===
+
+    window.terminalAPI.onTabCreated(({ tabId, cwd, background, banner }) => {
+      createTabUI(tabId, cwd, background);
+      const tab = tabs.get(tabId);
+      if (tab && banner) {
+        tab.bannerPayload = banner;
+        updateTabColors();
+        if (tabId === activeTabId) updateBanner(banner);
+      }
     });
 
-    // Menu actions
-    let currentFontSize = 13;
+    window.terminalAPI.onTabClosed((tabId) => {
+      removeTabUI(tabId);
+    });
+
+    window.terminalAPI.onTabTitle(() => {
+      // Tab title is set by the shell's OSC title sequence, not by cwd changes
+    });
+
+    window.terminalAPI.onData((tabId, data) => {
+      const tab = tabs.get(tabId);
+      if (tab) tab.terminal.write(data);
+    });
+
+    window.terminalAPI.onBannerUpdate((tabId, payload) => {
+      const tab = tabs.get(tabId);
+      if (tab) {
+        tab.bannerPayload = payload;
+        if (tabId === activeTabId) {
+          updateBanner(payload);
+          updateTabColors();
+        }
+      }
+    });
+
+    // Resize observer on the container
+    const resizeObserver = new ResizeObserver(() => {
+      const tab = tabs.get(activeTabId);
+      if (tab) {
+        tab.fitAddon.fit();
+        window.terminalAPI.sendResize(activeTabId, tab.terminal.cols, tab.terminal.rows);
+      }
+    });
+    resizeObserver.observe(terminalContainer);
+
+    // Menu actions — route to active tab
     window.terminalAPI.onMenuCopy(() => {
-      const sel = terminal.getSelection();
-      if (sel) navigator.clipboard.writeText(sel);
+      const tab = tabs.get(activeTabId);
+      if (tab) { const sel = tab.terminal.getSelection(); if (sel) navigator.clipboard.writeText(sel); }
     });
     window.terminalAPI.onMenuPaste(async () => {
-      const text = await navigator.clipboard.readText();
-      if (text) window.terminalAPI.sendInput(text);
+      const tab = tabs.get(activeTabId);
+      if (tab) { const text = await navigator.clipboard.readText(); if (text) window.terminalAPI.sendInput(activeTabId, text); }
     });
     window.terminalAPI.onMenuSelectAll(() => {
-      terminal.selectAll();
+      const tab = tabs.get(activeTabId);
+      if (tab) tab.terminal.selectAll();
     });
     window.terminalAPI.onMenuClear(() => {
-      terminal.clear();
+      const tab = tabs.get(activeTabId);
+      if (tab) tab.terminal.clear();
     });
     window.terminalAPI.onMenuZoom((direction) => {
       if (direction === 'in') currentFontSize = Math.min(32, currentFontSize + 1);
       else if (direction === 'out') currentFontSize = Math.max(8, currentFontSize - 1);
       else currentFontSize = 13;
-      terminal.options.fontSize = currentFontSize;
-      fitAddon.fit();
-      window.terminalAPI.sendResize(terminal.cols, terminal.rows);
+      for (const [tid, tab] of tabs) {
+        tab.terminal.options.fontSize = currentFontSize;
+        if (tid === activeTabId) {
+          tab.fitAddon.fit();
+          window.terminalAPI.sendResize(tid, tab.terminal.cols, tab.terminal.rows);
+        }
+      }
     });
 
-    // Signal ready
-    terminal.focus();
+    // Tab navigation
+    window.terminalAPI.onSwitchTab((target) => {
+      if (tabOrder.length <= 1) return;
+      if (typeof target === 'number') {
+        // Index-based (0-8)
+        if (target < tabOrder.length) switchToTab(tabOrder[target]);
+      } else if (target === 'next') {
+        const idx = tabOrder.indexOf(activeTabId);
+        switchToTab(tabOrder[(idx + 1) % tabOrder.length]);
+      } else if (target === 'prev') {
+        const idx = tabOrder.indexOf(activeTabId);
+        switchToTab(tabOrder[(idx - 1 + tabOrder.length) % tabOrder.length]);
+      }
+    });
+
+    window.terminalAPI.onRequestNewTab(() => {
+      window.terminalAPI.createTab({});
+    });
+
+    window.terminalAPI.onRequestCloseTab(() => {
+      if (activeTabId) window.terminalAPI.closeTab(activeTabId);
+    });
+
+    // Plus buttons (in banner + in tab bar filler)
+    document.getElementById('banner-add').addEventListener('click', () => {
+      window.terminalAPI.createTab({});
+    });
+    document.getElementById('tab-filler-add').addEventListener('click', () => {
+      window.terminalAPI.createTab({});
+    });
+
+    // Boot
     window.terminalAPI.ready();
   </script>
 </body>
