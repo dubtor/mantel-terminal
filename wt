@@ -1,0 +1,39 @@
+#!/bin/bash
+# Wrapped Terminal launcher
+# Usage:
+#   wt                    - Open in current directory
+#   wt /path/to/project   - Open in specific directory
+#   wt --set-banner IMAGE - Set banner for current/given project
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+if [ "$1" = "--set-banner" ]; then
+  if [ -z "$2" ]; then
+    echo "Usage: wt --set-banner <image-path> [project-dir]"
+    echo ""
+    echo "Copies the image to <project-dir>/.terminal/banner.<ext>"
+    echo "so it can be checked into the repo."
+    exit 1
+  fi
+
+  IMAGE="$2"
+  PROJECT_DIR="${3:-.}"
+  PROJECT_DIR="$(cd "$PROJECT_DIR" && pwd)"
+  EXT="${IMAGE##*.}"
+
+  mkdir -p "$PROJECT_DIR/.terminal"
+  cp "$IMAGE" "$PROJECT_DIR/.terminal/banner.${EXT}"
+  echo "Banner set: $PROJECT_DIR/.terminal/banner.${EXT}"
+  exit 0
+fi
+
+TARGET_DIR="${1:-.}"
+TARGET_DIR="$(cd "$TARGET_DIR" 2>/dev/null && pwd)"
+
+if [ -z "$TARGET_DIR" ]; then
+  echo "Error: Directory '$1' not found"
+  exit 1
+fi
+
+cd "$SCRIPT_DIR" && npm start -- "$TARGET_DIR" 2>/dev/null &
+disown
