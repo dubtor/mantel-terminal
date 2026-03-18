@@ -596,7 +596,21 @@ function buildMenu(pkg) {
         {
           label: 'New Window',
           accelerator: 'CmdOrCtrl+N',
-          click: () => createWindow(),
+          click: (_item, win) => {
+            if (!win) { createWindow(); return; }
+            const entry = windows.get(win.id);
+            if (!entry) { createWindow(); return; }
+            try {
+              const { execSync } = require('child_process');
+              const pid = entry.ptyProcess.pid;
+              const result = execSync(`lsof -p ${pid} -Fn 2>/dev/null | grep '^n/' | grep 'cwd' || lsof -a -p ${pid} -d cwd -Fn 2>/dev/null | tail -1 | sed 's/^n//'`, {
+                encoding: 'utf8', timeout: 1000,
+              }).trim().replace(/^n/, '');
+              createWindow(result || entry.startDir);
+            } catch (_e) {
+              createWindow(entry.startDir);
+            }
+          },
         },
         { type: 'separator' },
         {
