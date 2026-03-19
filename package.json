@@ -4,6 +4,9 @@
   "version": "1.0.0",
   "description": "Terminal wrapper with project-specific branding, tabs, and contextual menus",
   "main": "main.js",
+  "bin": {
+    "mantel": "./mantel"
+  },
   "scripts": {
     "postinstall": "node scripts/patch-electron-name.js",
     "start": "electron .",

@@ -8,7 +8,7 @@
 #   mantel init --icon ../favicon.png   - Set project icon
 #   mantel init --name "My Project"     - Set project name
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "$0" 2>/dev/null || realpath "$0" 2>/dev/null || echo "$0")")" && pwd)"
 
 if [ "$1" = "init" ]; then
   shift
@@ -31,15 +31,45 @@ if [ "$1" = "init" ]; then
   MANTEL_DIR="$PROJECT_DIR/.mantel"
   mkdir -p "$MANTEL_DIR"
 
-  # Copy icon if provided
+  # Resolve icon path (stored as relative path in config.json)
+  ICON_PATH=""
   if [ -n "$ICON" ]; then
     if [ ! -f "$ICON" ]; then
       echo "Error: Icon file '$ICON' not found"
       exit 1
     fi
-    EXT="${ICON##*.}"
-    cp "$ICON" "$MANTEL_DIR/icon.${EXT}"
-    echo "Icon set: $MANTEL_DIR/icon.${EXT}"
+    # Convert to path relative to project root
+    ICON_ABS="$(cd "$(dirname "$ICON")" && pwd)/$(basename "$ICON")"
+    ICON_PATH="${ICON_ABS#$PROJECT_DIR/}"
+    echo "Icon set: $ICON_PATH"
+  fi
+
+  # Auto-detect icon if none provided and config doesn't already have one
+  if [ -z "$ICON_PATH" ]; then
+    # Check if config already has an icon set
+    HAS_ICON=$(python3 -c "
+import json
+try:
+    c = json.load(open('$MANTEL_DIR/config.json'))
+    print('yes' if c.get('icon') else 'no')
+except: print('no')
+" 2>/dev/null)
+
+    if [ "$HAS_ICON" = "no" ]; then
+      ICON_NAMES="favicon logo icon app-icon appicon logo-icon brand"
+      ICON_EXTS="png jpg jpeg gif webp svg ico"
+
+      for name in $ICON_NAMES; do
+        for ext in $ICON_EXTS; do
+          MATCH=$(find "$PROJECT_DIR" -maxdepth 3 -name "${name}.${ext}" -not -path '*/node_modules/*' -not -path '*/.git/*' -not -path '*/.mantel/*' -print -quit 2>/dev/null)
+          if [ -n "$MATCH" ]; then
+            ICON_PATH="${MATCH#$PROJECT_DIR/}"
+            echo "Auto-detected icon: $ICON_PATH"
+            break 2
+          fi
+        done
+      done
+    fi
   fi
 
   # Build or update config.json
@@ -57,11 +87,20 @@ import json, sys
 config = json.loads('''$EXISTING''')
 color = '''$COLOR'''
 name = '''$NAME'''
-if color: config['color'] = color
+icon_path = '''$ICON_PATH'''
+if color: config['backgroundColor'] = color
 if name: config['name'] = name
+if icon_path: config['icon'] = icon_path
 if not config.get('name'):
     import os
-    config['name'] = os.path.basename('''$PROJECT_DIR''')
+    pkg = os.path.join('''$PROJECT_DIR''', 'package.json')
+    if os.path.isfile(pkg):
+        try:
+            pname = json.load(open(pkg)).get('name', '')
+            if pname: config['name'] = pname
+        except: pass
+    if not config.get('name'):
+        config['name'] = os.path.basename('''$PROJECT_DIR''')
 json.dump(config, sys.stdout, indent=2)
 print()
 " > "$CONFIG.tmp" && mv "$CONFIG.tmp" "$CONFIG"

@@ -40,7 +40,7 @@ Per-tab polling every 2s using `lsof -p <pid> -Fn` on macOS to get the shell's c
 ### Project Customization
 
 Projects opt in by creating a `.mantel/` directory containing:
-- `config.json` — Optional: `{ name, color, textColor }`
+- `config.json` — Optional: `{ name, backgroundColor, textColor, icon }`
 - `icon.*` (png/jpg/gif/webp/svg) — Project icon (falls back to auto-generated initial with hashed color)
 
 ## Key Dependencies

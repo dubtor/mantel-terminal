@@ -77,7 +77,7 @@
     #project-path-row {
       display: flex;
       align-items: center;
-      gap: 5px;
+      gap: 8px;
     }
 
     .action-icon {
@@ -89,6 +89,36 @@
     }
     .action-icon:hover { opacity: 1; }
     .action-icon svg { display: block; }
+
+    #recent-dirs-dropdown {
+      position: fixed;
+      min-width: 240px;
+      max-height: 300px;
+      overflow-y: auto;
+      background: #1e1e2e;
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 6px;
+      padding: 4px 0;
+      z-index: 1000;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+    }
+    #recent-dirs-dropdown .recent-dir-item {
+      padding: 6px 12px;
+      font-size: 12px;
+      color: #cdd6f4;
+      cursor: pointer;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    #recent-dirs-dropdown .recent-dir-item:hover {
+      background: rgba(255,255,255,0.08);
+    }
+    #recent-dirs-dropdown .recent-dir-empty {
+      padding: 6px 12px;
+      font-size: 12px;
+      color: rgba(255,255,255,0.35);
+    }
 
     #infobar-git {
       display: flex;
@@ -271,6 +301,17 @@
                 <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
               </svg>
             </span>
+            <span id="copy-path" class="action-icon" title="Copy path">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+              </svg>
+            </span>
+            <span id="recent-dirs-toggle" class="action-icon" title="Recent directories" style="position:relative;">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="6 9 12 15 18 9"/>
+              </svg>
+              <div id="recent-dirs-dropdown" style="display:none;"></div>
+            </span>
           </div>
         </div>
         <div id="infobar-git" style="display:none;">
@@ -351,8 +392,8 @@
       for (const [tid, tab] of tabs) {
         if (!tab.tabButton || !tab.projectInfo) continue;
         const cfg = tab.projectInfo.config;
-        const hasConfig = cfg && cfg.color;
-        const bgColor = hasConfig ? cfg.color : hashColor(tab.projectInfo.projectName);
+        const hasConfig = cfg && cfg.backgroundColor;
+        const bgColor = hasConfig ? cfg.backgroundColor : hashColor(tab.projectInfo.projectName);
         const light = isLightColor(bgColor);
         const isActive = tid === activeTabId;
         tab.tabButton.style.background = bgColor;
@@ -365,8 +406,8 @@
       const activeTab = tabs.get(activeTabId);
       if (activeTab && activeTab.projectInfo) {
         const cfg = activeTab.projectInfo.config;
-        const hasConfig = cfg && cfg.color;
-        const bg = hasConfig ? cfg.color : hashColor(activeTab.projectInfo.projectName);
+        const hasConfig = cfg && cfg.backgroundColor;
+        const bg = hasConfig ? cfg.backgroundColor : hashColor(activeTab.projectInfo.projectName);
         filler.style.background = bg;
         filler.style.opacity = '0.9';
         filler.style.filter = 'brightness(0.9)';
@@ -491,9 +532,9 @@
       const nameEl = document.getElementById('project-name');
       const pathEl = document.getElementById('project-path');
 
-      const hasConfig = config && config.color;
+      const hasConfig = config && config.backgroundColor;
       const fallbackColor = hashColor(projectName);
-      const bgColor = hasConfig ? config.color : fallbackColor;
+      const bgColor = hasConfig ? config.backgroundColor : fallbackColor;
       const light = isLightColor(bgColor);
       const textColor = (config && config.textColor) || (light ? '#1e1e2e' : '#ffffff');
       const subTextColor = (config && config.textColor)
@@ -520,11 +561,60 @@
         icon.insertAdjacentText('afterbegin', projectName.charAt(0).toUpperCase());
       }
 
-      // Finder & add button
+      // Finder, copy path & add button
       const openFinderEl = document.getElementById('open-finder');
+      const copyPathEl = document.getElementById('copy-path');
       openFinderEl.style.color = subTextColor;
+      copyPathEl.style.color = subTextColor;
       document.getElementById('infobar-add').style.color = subTextColor;
       openFinderEl.onclick = () => window.terminalAPI.openInFinder(cwd);
+      copyPathEl.onclick = () => {
+        navigator.clipboard.writeText(cwd).then(() => {
+          const orig = copyPathEl.innerHTML;
+          copyPathEl.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+          setTimeout(() => { copyPathEl.innerHTML = orig; }, 1200);
+        });
+      };
+
+      // Recent dirs dropdown
+      const recentToggle = document.getElementById('recent-dirs-toggle');
+      const recentDropdown = document.getElementById('recent-dirs-dropdown');
+      recentToggle.style.color = subTextColor;
+      recentToggle.onclick = async (e) => {
+        e.stopPropagation();
+        if (recentDropdown.style.display !== 'none') {
+          recentDropdown.style.display = 'none';
+          return;
+        }
+        const rect = recentToggle.getBoundingClientRect();
+        recentDropdown.style.top = (rect.bottom + 6) + 'px';
+        recentDropdown.style.left = rect.left + 'px';
+        const dirs = await window.terminalAPI.getRecentDirs();
+        recentDropdown.innerHTML = '';
+        if (dirs.length === 0) {
+          recentDropdown.innerHTML = '<div class="recent-dir-empty">No recent directories</div>';
+        } else {
+          dirs.forEach(dir => {
+            const item = document.createElement('div');
+            item.className = 'recent-dir-item';
+            item.textContent = shortenPath(dir);
+            item.title = dir;
+            item.onclick = (ev) => {
+              ev.stopPropagation();
+              recentDropdown.style.display = 'none';
+              window.terminalAPI.navigateToDir(dir);
+            };
+            recentDropdown.appendChild(item);
+          });
+        }
+        recentDropdown.style.display = 'block';
+      };
+      if (!window._recentDirClickHandler) {
+        window._recentDirClickHandler = true;
+        document.addEventListener('click', () => {
+          document.getElementById('recent-dirs-dropdown').style.display = 'none';
+        });
+      }
 
       // Git
       const gitContainer = document.getElementById('infobar-git');

@@ -14,6 +14,36 @@ let nextTabId = 1;
 
 const TERMINAL_DIR = '.mantel';
 const MANTEL_HOME = path.join(process.env.HOME || '', '.mantel');
+const RECENT_DIRS_PATH = path.join(MANTEL_HOME, 'recent_dirs.json');
+const MAX_RECENT_DIRS = 20;
+
+function loadRecentDirs() {
+  try {
+    if (fs.existsSync(RECENT_DIRS_PATH)) {
+      return JSON.parse(fs.readFileSync(RECENT_DIRS_PATH, 'utf8'));
+    }
+  } catch (_e) { /* ignore */ }
+  return [];
+}
+
+function saveRecentDirs(dirs) {
+  try {
+    if (!fs.existsSync(MANTEL_HOME)) fs.mkdirSync(MANTEL_HOME, { recursive: true });
+    fs.writeFileSync(RECENT_DIRS_PATH, JSON.stringify(dirs));
+  } catch (_e) { /* ignore */ }
+}
+
+function addRecentDir(dir) {
+  const home = process.env.HOME || '';
+  // Skip home directory itself — not useful as a "recent" entry
+  if (dir === home) return;
+  let dirs = loadRecentDirs();
+  dirs = dirs.filter(d => d !== dir);
+  dirs.unshift(dir);
+  if (dirs.length > MAX_RECENT_DIRS) dirs = dirs.slice(0, MAX_RECENT_DIRS);
+  saveRecentDirs(dirs);
+  rebuildMenuWithRecent();
+}
 
 // Built-in themes
 const THEMES = {
@@ -59,7 +89,7 @@ function loadTheme() {
 }
 
 const terminalTheme = loadTheme();
-const IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg'];
+const IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.ico'];
 
 function detectGitInfo(cwd) {
   try {
@@ -86,6 +116,8 @@ function findProjectConfig(cwd) {
   let dir = cwd;
   while (dir !== path.dirname(dir)) {
     const terminalDir = path.join(dir, TERMINAL_DIR);
+    // Skip ~/.mantel — that's the global config, not a project
+    if (terminalDir === MANTEL_HOME) { dir = path.dirname(dir); continue; }
     if (fs.existsSync(terminalDir)) {
       let config = {};
       const configPath = path.join(terminalDir, 'config.json');
@@ -93,9 +125,9 @@ function findProjectConfig(cwd) {
         try { config = JSON.parse(fs.readFileSync(configPath, 'utf8')); } catch (_e) { /* */ }
       }
       let iconPath = null;
-      for (const ext of IMAGE_EXTENSIONS) {
-        const p = path.join(terminalDir, 'icon' + ext);
-        if (fs.existsSync(p)) { iconPath = p; break; }
+      if (config.icon) {
+        const resolved = path.isAbsolute(config.icon) ? config.icon : path.resolve(dir, config.icon);
+        if (fs.existsSync(resolved)) iconPath = resolved;
       }
       return {
         config,
@@ -111,7 +143,7 @@ function findProjectConfig(cwd) {
 
 function fileToDataURL(filePath) {
   const ext = path.extname(filePath).toLowerCase();
-  const mimeTypes = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp', '.svg': 'image/svg+xml' };
+  const mimeTypes = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp', '.svg': 'image/svg+xml', '.ico': 'image/x-icon' };
   const mime = mimeTypes[ext] || 'application/octet-stream';
   const data = fs.readFileSync(filePath);
   return `data:${mime};base64,${data.toString('base64')}`;
@@ -156,7 +188,7 @@ async function updateDockIcon(projectName, config, iconPath, emoji) {
 
     let badgeBuffer;
     if (iconPath) {
-      const bgColor = (config && config.color) || hashColor(projectName);
+      const bgColor = (config && config.backgroundColor) || hashColor(projectName);
       const r = badgeSize / 2;
       const iconPadding = Math.round(badgeSize * 0.15);
       const iconInnerSize = badgeSize - iconPadding * 2;
@@ -188,7 +220,7 @@ async function updateDockIcon(projectName, config, iconPath, emoji) {
         .composite([{ input: iconSvgBuffer, left: iconOffset, top: iconOffset }])
         .png().toBuffer();
     } else {
-      const bgColor = (config && config.color) || hashColor(projectName);
+      const bgColor = (config && config.backgroundColor) || hashColor(projectName);
       const light = isLightColor(bgColor);
       const textColor = (config && config.textColor) || (light ? '#1e1e2e' : '#ffffff');
       const initial = projectName.charAt(0).toUpperCase();
@@ -322,9 +354,10 @@ function createTab(windowId, cwd, opts = {}) {
     closeTab(windowId, tabId);
   });
 
-  // Poll for directory changes and SSH
+  // Poll for directory changes, SSH, and config changes
   let lastCwd = cwd;
   let lastSSHHost = null;
+  let lastConfigMtime = 0;
   const pollInterval = setInterval(() => {
     try {
       const pid = ptyProc.pid;
@@ -335,7 +368,7 @@ function createTab(windowId, cwd, opts = {}) {
         lastSSHHost = sshHost;
         if (sshInfo) {
           const displayName = sshInfo.user ? `${sshInfo.user}@${sshInfo.host}` : sshInfo.host;
-          const sshConfig = { color: SSH_COLOR };
+          const sshConfig = { backgroundColor: SSH_COLOR };
           const light = isLightColor(SSH_COLOR);
           const iconColor = light ? '#1e1e2e' : '#ffffff';
           const svg = buildSpecialDirIconSvg('ssh', 24, iconColor);
@@ -357,8 +390,25 @@ function createTab(windowId, cwd, opts = {}) {
       const detectedCwd = getTabCwd(currentTab);
       if (!detectedCwd) return;
 
-      if (detectedCwd !== lastCwd && fs.existsSync(detectedCwd)) {
+      // Check if .mantel/config.json has been modified
+      let configChanged = false;
+      if (detectedCwd === lastCwd) {
+        const { projectRoot } = findProjectConfig(detectedCwd);
+        if (projectRoot) {
+          const configPath = path.join(projectRoot, TERMINAL_DIR, 'config.json');
+          try {
+            const mtime = fs.statSync(configPath).mtimeMs;
+            if (mtime !== lastConfigMtime) {
+              lastConfigMtime = mtime;
+              configChanged = true;
+            }
+          } catch (_e) { /* no config file */ }
+        }
+      }
+
+      if ((detectedCwd !== lastCwd && fs.existsSync(detectedCwd)) || configChanged) {
         lastCwd = detectedCwd;
+        addRecentDir(detectedCwd);
         const payload = buildProjectPayload(detectedCwd);
         entry.window.webContents.send('update-project', tabId, {
           cwd: payload.cwd, iconData: payload.iconData,
@@ -378,6 +428,7 @@ function createTab(windowId, cwd, opts = {}) {
 
   const tab = { ptyProcess: ptyProc, pollInterval, startDir: cwd, lastCwd, lastSSHHost };
   entry.tabs.set(tabId, tab);
+  addRecentDir(cwd);
 
   // If this is the first tab or not background, make it active
   if (!opts.background || entry.tabs.size === 1) {
@@ -536,6 +587,26 @@ ipcMain.on('open-in-finder', (_event, dirPath) => {
   if (typeof dirPath === 'string' && fs.existsSync(dirPath)) shell.openPath(dirPath);
 });
 
+// === Recent Folders ===
+
+function navigateToDir(dir) {
+  const win = BrowserWindow.getFocusedWindow();
+  if (!win) return;
+  const entry = windows.get(win.id);
+  if (!entry || !entry.activeTabId) return;
+  const tab = entry.tabs.get(entry.activeTabId);
+  if (!tab) return;
+  // Send cd command to the active PTY, escaping single quotes in the path
+  const escaped = dir.replace(/'/g, "'\\''");
+  tab.ptyProcess.write(`cd '${escaped}'\n`);
+}
+
+ipcMain.on('navigate-to-dir', (_event, dir) => {
+  navigateToDir(dir);
+});
+
+ipcMain.handle('get-recent-dirs', () => loadRecentDirs());
+
 // === Run Menu ===
 
 function findPackageScripts(cwd) {
@@ -566,6 +637,10 @@ function updateMenuForDirectory(cwd) {
     currentScripts = pkg;
     Menu.setApplicationMenu(buildMenu(pkg));
   }
+}
+
+function rebuildMenuWithRecent() {
+  Menu.setApplicationMenu(buildMenu(currentScripts));
 }
 
 function runScriptInNewTab(command) {
@@ -636,6 +711,22 @@ function buildMenu(pkg) {
             if (!win) return;
             win.webContents.send('request-new-tab');
           },
+        },
+        { type: 'separator' },
+        {
+          label: 'Recent Folders',
+          submenu: (() => {
+            const dirs = loadRecentDirs();
+            if (dirs.length === 0) return [{ label: 'No Recent Folders', enabled: false }];
+            const home = process.env.HOME || '';
+            const items = dirs.map(dir => ({
+              label: dir.startsWith(home) ? '~' + dir.slice(home.length) : dir,
+              click: () => navigateToDir(dir),
+            }));
+            items.push({ type: 'separator' });
+            items.push({ label: 'Clear Recent Folders', click: () => { saveRecentDirs([]); rebuildMenuWithRecent(); } });
+            return items;
+          })(),
         },
         { type: 'separator' },
         {

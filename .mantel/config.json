@@ -1,5 +1,6 @@
 {
   "name": "Mantel",
-  "color": "#2d3748",
-  "textColor": "#ffffff"
+  "backgroundColor": "#2d3748",
+  "textColor": "#ffffff",
+  "icon": ".mantel/icon.png"
 }
