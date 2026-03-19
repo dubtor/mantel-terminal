@@ -3,7 +3,7 @@ const path = require('path');
 const fs = require('fs');
 const pty = require('node-pty');
 const sharp = require('sharp');
-const { execSync } = require('child_process');
+const { execSync, spawn } = require('child_process');
 
 app.setName('Mantel');
 app.setAboutPanelOptions({
@@ -192,7 +192,7 @@ function setTheme(name) {
   }
   rebuildMenuWithRecent();
 }
-const IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.ico'];
+const IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg'];
 
 function detectGitInfo(cwd) {
   try {
@@ -246,7 +246,7 @@ function findProjectConfig(cwd) {
 
 function fileToDataURL(filePath) {
   const ext = path.extname(filePath).toLowerCase();
-  const mimeTypes = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp', '.svg': 'image/svg+xml', '.ico': 'image/x-icon' };
+  const mimeTypes = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp', '.svg': 'image/svg+xml' };
   const mime = mimeTypes[ext] || 'application/octet-stream';
   const data = fs.readFileSync(filePath);
   return `data:${mime};base64,${data.toString('base64')}`;
@@ -326,14 +326,14 @@ async function updateDockIcon(projectName, config, iconPath, emoji) {
       const bgColor = (config && config.backgroundColor) || hashColor(projectName);
       const light = isLightColor(bgColor);
       const textColor = light ? '#1e1e2e' : '#ffffff';
-      const initial = projectName.charAt(0).toUpperCase();
+      const initial = projectName.charAt(0).toUpperCase() + (projectName.length > 1 ? projectName.charAt(1).toLowerCase() : '');
       const r = badgeSize / 2;
       const strokeColor = light ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.15)';
       const badgeSvg = `<svg width="${badgeSize}" height="${badgeSize}" xmlns="http://www.w3.org/2000/svg">
         <circle cx="${r}" cy="${r}" r="${r - 1}" fill="${bgColor}" stroke="${strokeColor}" stroke-width="${strokeWidth}"/>
-        <text x="50%" y="54%" dominant-baseline="middle" text-anchor="middle"
+        <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle"
               font-family="SF Pro Display, Helvetica Neue, Arial, sans-serif"
-              font-size="110" font-weight="700" fill="${textColor}">${initial}</text>
+              font-size="95" font-weight="700" fill="${textColor}">${initial}</text>
       </svg>`;
       badgeBuffer = await sharp(Buffer.from(badgeSvg)).png().toBuffer();
     }
@@ -962,7 +962,7 @@ function writeFinderActions(appPath) {
   const mantelHome = path.join(process.env.HOME, '.mantel');
   const actions = [
     { name: 'New Mantel Tab Here', cmd: `mkdir -p "${mantelHome}" && for f in "$@"; do echo "$f" > "${mantelHome}/pending-tab"; open -a "${appPath}"; done` },
-    { name: 'New Mantel Window Here', cmd: `for f in "$@"; do open -n -a "${appPath}" --args "$f"; done` },
+    { name: 'New Mantel Terminal Here', cmd: `for f in "$@"; do open -n -a "${appPath}" --args "$f"; done` },
   ];
 
   for (const action of actions) {
@@ -1145,11 +1145,19 @@ function buildMenu(pkg) {
       label: 'Shell',
       submenu: [
         {
-          label: 'New Window',
+          label: 'New Terminal',
           accelerator: 'CmdOrCtrl+N',
           click: (_item, win) => {
             const cwd = win ? getActiveTabCwdForWindow(win) : null;
-            createWindow(cwd);
+            const dir = cwd || getStartDir();
+            if (app.isPackaged) {
+              // Packaged: launch the .app bundle as a new process
+              const appPath = path.dirname(path.dirname(path.dirname(app.getAppPath())));
+              spawn('open', ['-n', appPath, '--args', dir], { detached: true, stdio: 'ignore' });
+            } else {
+              // Dev: launch a new Electron process
+              spawn(process.execPath, ['.', dir], { detached: true, stdio: 'ignore', cwd: __dirname });
+            }
           },
         },
         {

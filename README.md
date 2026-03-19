@@ -119,7 +119,7 @@ It also detects SSH sessions by inspecting child processes, and discovers `packa
 4. Remove Finder actions:
    ```bash
    rm -rf ~/Library/Services/"New Mantel Tab Here.workflow"
-   rm -rf ~/Library/Services/"New Mantel Window Here.workflow"
+   rm -rf ~/Library/Services/"New Mantel Terminal Here.workflow"
    ```
 
 ## Platform

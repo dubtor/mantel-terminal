@@ -62,7 +62,7 @@ except: print('no')
 
     if [ "$HAS_ICON" = "no" ]; then
       ICON_NAMES="favicon favico logo icon app-icon appicon logo-icon brand"
-      ICON_EXTS="png jpg jpeg gif webp svg ico"
+      ICON_EXTS="png jpg jpeg gif webp svg"
 
       for name in $ICON_NAMES; do
         for ext in $ICON_EXTS; do

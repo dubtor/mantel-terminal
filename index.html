@@ -616,7 +616,7 @@
         icon.style.background = light ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.2)';
         icon.style.color = light ? '#1e1e2e' : '#ffffff';
         icon.style.fontSize = '16px';
-        icon.insertAdjacentText('afterbegin', projectName.charAt(0).toUpperCase());
+        icon.insertAdjacentText('afterbegin', projectName.charAt(0).toUpperCase() + (projectName.length > 1 ? projectName.charAt(1).toLowerCase() : ''));
       }
 
       // Finder, copy path & add button
