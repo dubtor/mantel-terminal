@@ -321,11 +321,15 @@ function buildSpecialDirIconSvg(iconKey, size, color) {
   return svgFn(color).replace('width="24"', `width="${size}"`).replace('height="24"', `height="${size}"`);
 }
 
-function getStartDir() {
-  return process.argv.slice(1).find(arg => {
+function getDirFromArgs(argv) {
+  return argv.slice(1).find(arg => {
     try { return !arg.startsWith('-') && !arg.includes('electron') && !arg.endsWith('.js') && !arg.endsWith('.') && fs.existsSync(arg) && fs.statSync(arg).isDirectory(); }
     catch (_e) { return false; }
-  }) || process.env.HOME || process.cwd();
+  });
+}
+
+function getStartDir() {
+  return getDirFromArgs(process.argv) || process.env.HOME || process.cwd();
 }
 
 // Build project info payload for a given cwd
@@ -765,7 +769,7 @@ function installCLI() {
     return;
   }
 
-  const script = `#!/bin/bash\nopen -a "${appPath}" --args "$@"\n`;
+  const script = `#!/bin/bash\nopen -n -a "${appPath}" --args "$@"\n`;
 
   try {
     fs.mkdirSync('/usr/local/bin', { recursive: true });
@@ -795,6 +799,152 @@ function installCLI() {
     } finally {
       try { fs.unlinkSync(tmpFile); } catch (_e3) { /* */ }
     }
+  }
+}
+function writeFinderActions(appPath) {
+  const servicesDir = path.join(process.env.HOME, 'Library', 'Services');
+  const mantelHome = path.join(process.env.HOME, '.mantel');
+  const actions = [
+    { name: 'New Mantel Tab Here', cmd: `mkdir -p "${mantelHome}" && for f in "$@"; do echo "$f" > "${mantelHome}/pending-tab"; open -a "${appPath}"; done` },
+    { name: 'New Mantel Window Here', cmd: `for f in "$@"; do open -n -a "${appPath}" --args "$f"; done` },
+  ];
+
+  for (const action of actions) {
+    const workflowDir = path.join(servicesDir, `${action.name}.workflow`, 'Contents');
+    fs.mkdirSync(workflowDir, { recursive: true });
+
+    fs.writeFileSync(path.join(workflowDir, 'Info.plist'), `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+\t<key>NSServices</key>
+\t<array>
+\t\t<dict>
+\t\t\t<key>NSMenuItem</key>
+\t\t\t<dict>
+\t\t\t\t<key>default</key>
+\t\t\t\t<string>${action.name}</string>
+\t\t\t</dict>
+\t\t\t<key>NSMessage</key>
+\t\t\t<string>runWorkflowAsService</string>
+\t\t\t<key>NSRequiredContext</key>
+\t\t\t<dict>
+\t\t\t\t<key>NSTextContent</key>
+\t\t\t\t<string>FilePath</string>
+\t\t\t</dict>
+\t\t\t<key>NSSendFileTypes</key>
+\t\t\t<array>
+\t\t\t\t<string>public.directory</string>
+\t\t\t</array>
+\t\t</dict>
+\t</array>
+</dict>
+</plist>`);
+
+    fs.writeFileSync(path.join(workflowDir, 'document.wflow'), `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+\t<key>AMBundleVersion</key>
+\t<integer>2</integer>
+\t<key>actions</key>
+\t<array>
+\t\t<dict>
+\t\t\t<key>action</key>
+\t\t\t<dict>
+\t\t\t\t<key>AMAccepts</key>
+\t\t\t\t<dict>
+\t\t\t\t\t<key>Container</key>
+\t\t\t\t\t<string>List</string>
+\t\t\t\t\t<key>Optional</key>
+\t\t\t\t\t<false/>
+\t\t\t\t\t<key>Types</key>
+\t\t\t\t\t<array>
+\t\t\t\t\t\t<string>com.apple.cocoa.path</string>
+\t\t\t\t\t</array>
+\t\t\t\t</dict>
+\t\t\t\t<key>AMActionVersion</key>
+\t\t\t\t<string>2.0.3</string>
+\t\t\t\t<key>AMApplication</key>
+\t\t\t\t<array>
+\t\t\t\t\t<string>Automator</string>
+\t\t\t\t</array>
+\t\t\t\t<key>AMBundleIdentifier</key>
+\t\t\t\t<string>com.apple.RunShellScript</string>
+\t\t\t\t<key>AMName</key>
+\t\t\t\t<string>Run Shell Script</string>
+\t\t\t\t<key>AMParameterProperties</key>
+\t\t\t\t<dict>
+\t\t\t\t\t<key>COMMAND_STRING</key>
+\t\t\t\t\t<dict/>
+\t\t\t\t\t<key>inputMethod</key>
+\t\t\t\t\t<dict/>
+\t\t\t\t\t<key>shell</key>
+\t\t\t\t\t<dict/>
+\t\t\t\t</dict>
+\t\t\t\t<key>AMProvides</key>
+\t\t\t\t<dict>
+\t\t\t\t\t<key>Container</key>
+\t\t\t\t\t<string>List</string>
+\t\t\t\t\t<key>Types</key>
+\t\t\t\t\t<array>
+\t\t\t\t\t\t<string>com.apple.cocoa.string</string>
+\t\t\t\t\t</array>
+\t\t\t\t</dict>
+\t\t\t\t<key>ActionBundlePath</key>
+\t\t\t\t<string>/System/Library/Automator/Run Shell Script.action</string>
+\t\t\t\t<key>ActionName</key>
+\t\t\t\t<string>Run Shell Script</string>
+\t\t\t\t<key>ActionParameters</key>
+\t\t\t\t<dict>
+\t\t\t\t\t<key>COMMAND_STRING</key>
+\t\t\t\t\t<string>${action.cmd.replace(/&/g, '&amp;')}</string>
+\t\t\t\t\t<key>CheckedForUserDefaultShell</key>
+\t\t\t\t\t<true/>
+\t\t\t\t\t<key>inputMethod</key>
+\t\t\t\t\t<integer>1</integer>
+\t\t\t\t\t<key>shell</key>
+\t\t\t\t\t<string>/bin/bash</string>
+\t\t\t\t</dict>
+\t\t\t\t<key>BundleIdentifier</key>
+\t\t\t\t<string>com.apple.RunShellScript</string>
+\t\t\t\t<key>CFBundleVersion</key>
+\t\t\t\t<string>2.0.3</string>
+\t\t\t\t<key>CanShowSelectedItemsWhenRun</key>
+\t\t\t\t<false/>
+\t\t\t\t<key>CanShowWhenRun</key>
+\t\t\t\t<false/>
+\t\t\t\t<key>Category</key>
+\t\t\t\t<array>
+\t\t\t\t\t<string>AMCategoryUtilities</string>
+\t\t\t\t</array>
+\t\t\t\t<key>Class Name</key>
+\t\t\t\t<string>RunShellScriptAction</string>
+\t\t\t\t<key>InputUUID</key>
+\t\t\t\t<string>0</string>
+\t\t\t\t<key>Keywords</key>
+\t\t\t\t<array>
+\t\t\t\t\t<string>Shell</string>
+\t\t\t\t\t<string>Script</string>
+\t\t\t\t</array>
+\t\t\t\t<key>OutputUUID</key>
+\t\t\t\t<string>0</string>
+\t\t\t\t<key>UUID</key>
+\t\t\t\t<string>0</string>
+\t\t\t</dict>
+\t\t</dict>
+\t</array>
+\t<key>connectors</key>
+\t<dict/>
+\t<key>workflowMetaData</key>
+\t<dict>
+\t\t<key>workflowTypeIdentifier</key>
+\t\t<string>com.apple.Automator.servicesMenu</string>
+\t\t<key>serviceInputTypeIdentifier</key>
+\t\t<string>com.apple.Automator.fileSystemObject</string>
+\t</dict>
+</dict>
+</plist>`);
   }
 }
 
@@ -924,16 +1074,48 @@ function buildMenu(pkg) {
   return Menu.buildFromTemplate(template);
 }
 
-app.whenReady().then(() => {
-  initSpecialDirs();
-  Menu.setApplicationMenu(buildMenu(null));
-  createWindow(getStartDir());
-});
-
-app.on('activate', () => {
-  if (windows.size === 0) createWindow();
-});
-
-app.on('window-all-closed', () => {
+// Handle --new-tab: write dir to pending file for an existing instance, then quit
+if (process.argv.includes('--new-tab')) {
+  const dir = getDirFromArgs(process.argv) || process.env.HOME || process.cwd();
+  const pendingFile = path.join(MANTEL_HOME, 'pending-tab');
+  fs.mkdirSync(MANTEL_HOME, { recursive: true });
+  fs.writeFileSync(pendingFile, dir);
   app.quit();
-});
+} else {
+  app.whenReady().then(() => {
+    initSpecialDirs();
+    Menu.setApplicationMenu(buildMenu(null));
+    createWindow(getStartDir());
+
+    // Auto-install Finder Quick Actions when running as packaged app
+    if (app.isPackaged) {
+      const appPath = path.dirname(path.dirname(path.dirname(app.getAppPath())));
+      try { writeFinderActions(appPath); } catch (_e) { /* silent */ }
+    }
+
+    // Watch for pending-tab requests from Finder "New Tab Here" action
+    const pendingFile = path.join(MANTEL_HOME, 'pending-tab');
+    fs.watch(MANTEL_HOME, (_eventType, filename) => {
+      if (filename !== 'pending-tab') return;
+      try {
+        const dir = fs.readFileSync(pendingFile, 'utf8').trim();
+        fs.unlinkSync(pendingFile);
+        if (!dir) return;
+        const focusedWin = BrowserWindow.getFocusedWindow();
+        const targetWin = focusedWin || [...windows.values()][0].window;
+        if (!targetWin) { createWindow(dir); return; }
+        const entry = windows.get(targetWin.id);
+        if (entry) createTab(targetWin.id, dir);
+        targetWin.focus();
+      } catch (_e) { /* file already consumed or not ready */ }
+    });
+  });
+
+  app.on('activate', () => {
+    if (windows.size === 0) createWindow();
+  });
+
+  app.on('window-all-closed', () => {
+    app.quit();
+  });
+}

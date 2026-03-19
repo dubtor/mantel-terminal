@@ -103,6 +103,23 @@ Mantel is an Electron app wrapping xterm.js with node-pty. Each tab runs its own
 
 It also detects SSH sessions by inspecting child processes, and discovers `package.json` scripts to populate a contextual Run menu.
 
+## Uninstall
+
+1. Delete **Mantel.app** from `/Applications/`
+2. Remove user config and data:
+   ```bash
+   rm -rf ~/.mantel
+   ```
+3. Remove the CLI command (if installed):
+   ```bash
+   sudo rm /usr/local/bin/mantel
+   ```
+4. Remove Finder actions:
+   ```bash
+   rm -rf ~/Library/Services/"New Mantel Tab Here.workflow"
+   rm -rf ~/Library/Services/"New Mantel Window Here.workflow"
+   ```
+
 ## Platform
 
 macOS. Uses `lsof` for working directory detection, `app.dock` for dynamic dock icons, and zsh as the default shell.
