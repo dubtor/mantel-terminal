@@ -6,6 +6,12 @@ const sharp = require('sharp');
 const { execSync } = require('child_process');
 
 app.setName('Mantel');
+app.setAboutPanelOptions({
+  applicationName: 'Mantel',
+  applicationVersion: require('./package.json').version,
+  copyright: '© Robert Clemens, 83 Ventures',
+  iconPath: path.join(__dirname.replace('app.asar', 'app.asar.unpacked'), 'icon.png'),
+});
 
 // Track all open terminal windows: windowId -> { window, tabs, activeTabId, startDir }
 // Each tab: tabId -> { ptyProcess, pollInterval, startDir, lastCwd, lastSSHHost }
@@ -744,6 +750,54 @@ function getActiveTabCwdForWindow(win) {
   return getTabCwd(tab) || tab.startDir;
 }
 
+function installCLI() {
+  const target = '/usr/local/bin/mantel';
+  const appPath = app.isPackaged
+    ? path.dirname(path.dirname(path.dirname(app.getAppPath()))) // .app bundle
+    : null;
+
+  if (!appPath) {
+    dialog.showMessageBox({
+      icon: nativeImage.createFromPath(BASE_ICON_PATH),
+      message: 'CLI install is only available in the packaged app.',
+      detail: 'When running in development, use "npm link" instead.',
+    });
+    return;
+  }
+
+  const script = `#!/bin/bash\nopen -a "${appPath}" --args "$@"\n`;
+
+  try {
+    fs.mkdirSync('/usr/local/bin', { recursive: true });
+    fs.writeFileSync(target, script, { mode: 0o755 });
+    dialog.showMessageBox({
+      icon: nativeImage.createFromPath(BASE_ICON_PATH),
+      message: 'CLI command installed successfully.',
+      detail: `You can now use "mantel" from any terminal.\n\nInstalled to: ${target}`,
+    });
+  } catch (_e) {
+    // Permission denied — retry with admin privileges via osascript
+    const tmpFile = path.join(app.getPath('temp'), 'mantel-cli-install.sh');
+    fs.writeFileSync(tmpFile, script, { mode: 0o755 });
+    try {
+      execSync(`osascript -e 'do shell script "mkdir -p /usr/local/bin && cp ${tmpFile} ${target} && chmod 755 ${target}" with administrator privileges'`, { timeout: 30000 });
+      dialog.showMessageBox({
+        icon: nativeImage.createFromPath(BASE_ICON_PATH),
+        message: 'CLI command installed successfully.',
+        detail: `You can now use "mantel" from any terminal.\n\nInstalled to: ${target}`,
+      });
+    } catch (_e2) {
+      dialog.showMessageBox({
+        icon: nativeImage.createFromPath(BASE_ICON_PATH),
+        message: 'Failed to install CLI command.',
+        detail: 'Could not write to /usr/local/bin. You may need to create the symlink manually.',
+      });
+    } finally {
+      try { fs.unlinkSync(tmpFile); } catch (_e3) { /* */ }
+    }
+  }
+}
+
 function buildMenu(pkg) {
   const isMac = process.platform === 'darwin';
 
@@ -762,7 +816,15 @@ function buildMenu(pkg) {
     ...(isMac ? [{
       label: app.name,
       submenu: [
-        { role: 'about' },
+        {
+          label: 'About Mantel',
+          click: () => app.showAboutPanel(),
+        },
+        { type: 'separator' },
+        {
+          label: 'Install CLI Command…',
+          click: () => installCLI(),
+        },
         { type: 'separator' },
         { role: 'services' },
         { type: 'separator' },
