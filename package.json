@@ -38,6 +38,7 @@
       "preload.js",
       "index.html",
       "icon.png",
+      "assets/**/*",
       "node_modules/**/*"
     ],
     "extraResources": [
@@ -45,6 +46,7 @@
     ],
     "asarUnpack": [
       "icon.png",
+      "assets/**/*",
       "node_modules/sharp/**/*",
       "node_modules/node-pty/**/*"
     ],

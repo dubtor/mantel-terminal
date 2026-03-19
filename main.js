@@ -272,8 +272,16 @@ function hashColor(str) {
 }
 
 const BASE_ICON_PATH = path.join(__dirname.replace('app.asar', 'app.asar.unpacked'), 'icon.png');
+const ASSETS_DIR = path.join(__dirname.replace('app.asar', 'app.asar.unpacked'), 'assets');
 
-async function updateDockIcon(projectName, config, iconPath, emoji) {
+// Map of process names to custom base dock icons.
+// When a matching process is detected running in the active tab,
+// the dock icon base is swapped to the program-specific icon.
+const PROGRAM_ICONS = {
+  claude: path.join(ASSETS_DIR, 'icon-claude.png'),
+};
+
+async function updateDockIcon(projectName, config, iconPath, emoji, programBaseIcon) {
   if (process.platform !== 'darwin') return;
   try {
     const baseSize = 512;
@@ -285,7 +293,8 @@ async function updateDockIcon(projectName, config, iconPath, emoji) {
     const badgeLeft = canvasSize - badgeSize - 8;
     const badgeTop = canvasSize - badgeSize - 8;
 
-    const baseBuffer = await sharp(BASE_ICON_PATH)
+    const baseIconPath = programBaseIcon || BASE_ICON_PATH;
+    const baseBuffer = await sharp(baseIconPath)
       .resize(baseSize, baseSize)
       .png().toBuffer();
 
@@ -416,15 +425,23 @@ function detectSSH(shellPid) {
 
 function getRunningChildren(shellPid) {
   try {
-    const pids = execSync(`pgrep -P ${shellPid} 2>/dev/null`, {
+    const result = execSync(`ps -e -o pid,ppid,comm | awk -v p=${shellPid} '$2==p && $1!=p {print $3}'`, {
       encoding: 'utf8', timeout: 1000,
     }).trim();
-    if (!pids) return [];
-    const names = execSync(`ps -o comm= -p ${pids.split('\n').join(',')} 2>/dev/null`, {
-      encoding: 'utf8', timeout: 1000,
-    }).trim().split('\n').map(n => path.basename(n.trim())).filter(Boolean);
+    if (!result) return [];
+    const names = result.split('\n').map(n => path.basename(n.trim())).filter(Boolean);
     return [...new Set(names)];
   } catch (_e) { return []; }
+}
+
+// Detect if a known program (from PROGRAM_ICONS) is running as a child of the shell.
+// Returns the base icon path for that program, or null if none matched.
+function detectProgramIcon(shellPid) {
+  const children = getRunningChildren(shellPid);
+  for (const child of children) {
+    if (PROGRAM_ICONS[child]) return PROGRAM_ICONS[child];
+  }
+  return null;
 }
 
 function getWindowRunningProcesses(entry) {
@@ -520,16 +537,27 @@ function createTab(windowId, cwd, opts = {}) {
     closeTab(windowId, tabId);
   });
 
-  // Poll for directory changes, SSH, and config changes
+  // Poll for directory changes, SSH, config changes, and running programs
   let lastCwd = cwd;
   let lastSSHHost = null;
   let lastConfigMtime = 0;
   let lastPkgMtime = 0;
+  let lastProgramIcon = null;
   const pollInterval = setInterval(() => {
     try {
       const pid = ptyProc.pid;
+      const isActiveTab = entry.activeTabId === tabId;
       const sshInfo = detectSSH(pid);
       const sshHost = sshInfo ? sshInfo.host : null;
+
+      // Check for program icon changes only on the active tab
+      let programIcon = null;
+      let programIconChanged = false;
+      if (isActiveTab) {
+        programIcon = detectProgramIcon(pid);
+        programIconChanged = programIcon !== lastProgramIcon;
+        lastProgramIcon = programIcon;
+      }
 
       if (sshHost !== lastSSHHost) {
         lastSSHHost = sshHost;
@@ -544,8 +572,8 @@ function createTab(windowId, cwd, opts = {}) {
             cwd: displayName, iconData: sshIconData,
             projectName: sshInfo.host, config: sshConfig, gitInfo: null,
           });
-          if (entry.activeTabId === tabId && entry.window.isFocused()) {
-            updateDockIcon(sshInfo.host, sshConfig, null, 'ssh');
+          if (isActiveTab && entry.window.isFocused()) {
+            updateDockIcon(sshInfo.host, sshConfig, null, 'ssh', programIcon);
           }
           return;
         }
@@ -594,10 +622,14 @@ function createTab(windowId, cwd, opts = {}) {
           projectName: payload.projectName, config: payload.config, gitInfo: payload.gitInfo,
         });
         entry.window.webContents.send('tab-title', tabId, path.basename(detectedCwd));
-        if (entry.activeTabId === tabId) {
-          updateDockIcon(payload.projectName, payload.config, payload.iconPath, payload.specialIcon);
+        if (isActiveTab) {
+          updateDockIcon(payload.projectName, payload.config, payload.iconPath, payload.specialIcon, programIcon);
           updateMenuForDirectory(detectedCwd);
         }
+      } else if (programIconChanged && isActiveTab) {
+        // Only the running program changed — update dock icon without resending project info
+        const payload = buildProjectPayload(detectedCwd || lastCwd);
+        updateDockIcon(payload.projectName, payload.config, payload.iconPath, payload.specialIcon, programIcon);
       }
     } catch (_e) { /* ignore */ }
   }, 2000);
@@ -622,7 +654,8 @@ function createTab(windowId, cwd, opts = {}) {
   });
 
   if (entry.activeTabId === tabId) {
-    updateDockIcon(payload.projectName, payload.config, payload.iconPath, payload.specialIcon);
+    const initProgramIcon = detectProgramIcon(ptyProc.pid);
+    updateDockIcon(payload.projectName, payload.config, payload.iconPath, payload.specialIcon, initProgramIcon);
     updateMenuForDirectory(cwd);
   }
 
@@ -793,7 +826,8 @@ ipcMain.on('set-active-tab', (event, tabId) => {
   if (tab) {
     const cwd = getTabCwd(tab) || tab.startDir;
     const payload = buildProjectPayload(cwd);
-    updateDockIcon(payload.projectName, payload.config, payload.iconPath, payload.specialIcon);
+    const programIcon = detectProgramIcon(tab.ptyProcess.pid);
+    updateDockIcon(payload.projectName, payload.config, payload.iconPath, payload.specialIcon, programIcon);
     updateMenuForDirectory(cwd);
   }
 });
@@ -1260,6 +1294,38 @@ if (process.argv.includes('--new-tab')) {
     initSpecialDirs();
     Menu.setApplicationMenu(buildMenu(null));
     createWindow(getStartDir());
+
+    // Dock right-click context menu
+    if (process.platform === 'darwin') {
+      const dockMenu = Menu.buildFromTemplate([
+        {
+          label: 'New Terminal',
+          click: () => {
+            const focused = BrowserWindow.getFocusedWindow();
+            const cwd = focused ? getActiveTabCwdForWindow(focused) : null;
+            const dir = cwd || getStartDir();
+            if (app.isPackaged) {
+              const appPath = path.dirname(path.dirname(path.dirname(app.getAppPath())));
+              spawn('open', ['-n', appPath, '--args', dir], { detached: true, stdio: 'ignore' });
+            } else {
+              spawn(process.execPath, ['.', dir], { detached: true, stdio: 'ignore', cwd: __dirname });
+            }
+          },
+        },
+        {
+          label: 'New Tab',
+          click: () => {
+            const focused = BrowserWindow.getFocusedWindow();
+            const targetWin = focused || [...windows.values()][0]?.window;
+            if (targetWin) {
+              targetWin.webContents.send('request-new-tab');
+              targetWin.focus();
+            }
+          },
+        },
+      ]);
+      app.dock.setMenu(dockMenu);
+    }
 
     // Auto-install Finder Quick Actions when running as packaged app
     if (app.isPackaged) {
