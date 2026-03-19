@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, nativeImage, Menu, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, nativeImage, Menu, shell, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const pty = require('node-pty');
@@ -288,6 +288,27 @@ function detectSSH(shellPid) {
   } catch (_e) { return null; }
 }
 
+function getRunningChildren(shellPid) {
+  try {
+    const pids = execSync(`pgrep -P ${shellPid} 2>/dev/null`, {
+      encoding: 'utf8', timeout: 1000,
+    }).trim();
+    if (!pids) return [];
+    const names = execSync(`ps -o comm= -p ${pids.split('\n').join(',')} 2>/dev/null`, {
+      encoding: 'utf8', timeout: 1000,
+    }).trim().split('\n').map(n => path.basename(n.trim())).filter(Boolean);
+    return [...new Set(names)];
+  } catch (_e) { return []; }
+}
+
+function getWindowRunningProcesses(entry) {
+  const all = [];
+  for (const [, tab] of entry.tabs) {
+    all.push(...getRunningChildren(tab.ptyProcess.pid));
+  }
+  return [...new Set(all)];
+}
+
 function buildSpecialDirIconSvg(iconKey, size, color) {
   const svgFn = SPECIAL_DIR_ICONS[iconKey];
   if (!svgFn) return null;
@@ -510,6 +531,28 @@ function createWindow(startDir) {
   win.loadFile('index.html');
   windows.set(win.id, { window: win, tabs: new Map(), activeTabId: null, startDir });
 
+  win.on('close', (e) => {
+    const entry = windows.get(win.id);
+    if (entry && !entry.forceClose) {
+      const procs = getWindowRunningProcesses(entry);
+      if (procs.length > 0) {
+        e.preventDefault();
+        dialog.showMessageBox(win, {
+          buttons: ['Terminate', 'Cancel'],
+          defaultId: 1,
+          icon: nativeImage.createFromPath(BASE_ICON_PATH),
+          message: 'Do you want to terminate running processes in this window?',
+          detail: `Closing this window will terminate these running processes: ${procs.join(', ')}`,
+        }).then(({ response }) => {
+          if (response === 0) {
+            entry.forceClose = true;
+            win.close();
+          }
+        });
+      }
+    }
+  });
+
   win.on('closed', () => {
     const entry = windows.get(win.id);
     if (entry) {
@@ -566,7 +609,24 @@ ipcMain.on('create-tab', (event, opts = {}) => {
 
 ipcMain.on('close-tab', (event, tabId) => {
   const win = BrowserWindow.fromWebContents(event.sender);
-  if (win) closeTab(win.id, tabId);
+  if (!win) return;
+  const entry = windows.get(win.id);
+  if (!entry) return;
+  const tab = entry.tabs.get(tabId);
+  const procs = tab ? getRunningChildren(tab.ptyProcess.pid) : [];
+  if (procs.length > 0) {
+    dialog.showMessageBox(win, {
+      buttons: ['Terminate', 'Cancel'],
+      defaultId: 1,
+      icon: nativeImage.createFromPath(BASE_ICON_PATH),
+      message: 'Do you want to terminate running processes in this tab?',
+      detail: `Closing this tab will terminate these running processes: ${procs.join(', ')}`,
+    }).then(({ response }) => {
+      if (response === 0) closeTab(win.id, tabId);
+    });
+  } else {
+    closeTab(win.id, tabId);
+  }
 });
 
 ipcMain.on('set-active-tab', (event, tabId) => {
