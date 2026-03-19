@@ -9,7 +9,7 @@ app.setName('Mantel');
 app.setAboutPanelOptions({
   applicationName: 'Mantel',
   applicationVersion: require('./package.json').version,
-  copyright: '© Robert Clemens, 83 Ventures',
+  copyright: '© 2026 Robert Clemens (@dubtor), 83 Ventures',
   iconPath: path.join(__dirname.replace('app.asar', 'app.asar.unpacked'), 'icon.png'),
 });
 
@@ -228,7 +228,7 @@ async function updateDockIcon(projectName, config, iconPath, emoji) {
     } else {
       const bgColor = (config && config.backgroundColor) || hashColor(projectName);
       const light = isLightColor(bgColor);
-      const textColor = (config && config.textColor) || (light ? '#1e1e2e' : '#ffffff');
+      const textColor = light ? '#1e1e2e' : '#ffffff';
       const initial = projectName.charAt(0).toUpperCase();
       const r = badgeSize / 2;
       const strokeColor = light ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.15)';

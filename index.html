@@ -566,10 +566,8 @@
       const fallbackColor = hashColor(projectName);
       const bgColor = hasConfig ? config.backgroundColor : fallbackColor;
       const light = isLightColor(bgColor);
-      const textColor = (config && config.textColor) || (light ? '#1e1e2e' : '#ffffff');
-      const subTextColor = (config && config.textColor)
-        ? config.textColor + 'aa'
-        : (light ? 'rgba(30,30,46,0.6)' : 'rgba(255,255,255,0.7)');
+      const textColor = light ? '#1e1e2e' : '#ffffff';
+      const subTextColor = light ? 'rgba(30,30,46,0.6)' : 'rgba(255,255,255,0.7)';
 
       infobar.style.background = bgColor;
       nameEl.textContent = projectName;

@@ -4,22 +4,22 @@
 #   mantel                              - Open in current directory
 #   mantel /path/to/project             - Open in specific directory
 #   mantel init                         - Initialize .mantel/ in current directory
-#   mantel init --color "#1a56db"       - Set project color
-#   mantel init --icon ../favicon.png   - Set project icon
-#   mantel init --name "My Project"     - Set project name
+#   mantel init --background-color "#1a56db" - Set background color
+#   mantel init --icon ../favicon.png        - Set project icon
+#   mantel init --name "My Project"          - Set project name
 
 SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "$0" 2>/dev/null || realpath "$0" 2>/dev/null || echo "$0")")" && pwd)"
 
 if [ "$1" = "init" ]; then
   shift
   PROJECT_DIR="."
-  COLOR=""
+  BG_COLOR=""
   ICON=""
   NAME=""
 
   while [ $# -gt 0 ]; do
     case "$1" in
-      --color) COLOR="$2"; shift 2 ;;
+      --background-color) BG_COLOR="$2"; shift 2 ;;
       --icon) ICON="$2"; shift 2 ;;
       --name) NAME="$2"; shift 2 ;;
       --dir) PROJECT_DIR="$2"; shift 2 ;;
@@ -82,28 +82,73 @@ except: print('no')
   fi
 
   # Use python3 to merge JSON (available on macOS)
-  python3 -c "
-import json, sys
-config = json.loads('''$EXISTING''')
-color = '''$COLOR'''
-name = '''$NAME'''
-icon_path = '''$ICON_PATH'''
-if color: config['backgroundColor'] = color
+  # Write existing config to temp file for python to read
+  EXISTING_TMP="$CONFIG.existing"
+  echo "$EXISTING" > "$EXISTING_TMP"
+
+  BG_COLOR="$BG_COLOR" NAME="$NAME" ICON_PATH="$ICON_PATH" PROJECT_DIR="$PROJECT_DIR" \
+  EXISTING_FILE="$EXISTING_TMP" \
+  python3 << 'PYEOF' > "$CONFIG.tmp"
+import json, sys, os, re
+
+config = json.loads(open(os.environ['EXISTING_FILE']).read())
+bg_color = os.environ.get('BG_COLOR', '')
+name = os.environ.get('NAME', '')
+icon_path = os.environ.get('ICON_PATH', '')
+project = os.environ['PROJECT_DIR']
+
+if bg_color: config['backgroundColor'] = bg_color
 if name: config['name'] = name
 if icon_path: config['icon'] = icon_path
+
+# Auto-detect backgroundColor if not set
+if not config.get('backgroundColor') and not bg_color:
+    detected_color = None
+    # 1. Check PWA manifest (manifest.json, site.webmanifest)
+    for mname in ['manifest.json', 'site.webmanifest']:
+        for subdir in ['.', 'public', 'static', 'src']:
+            mp = os.path.join(project, subdir, mname)
+            if os.path.isfile(mp):
+                try:
+                    m = json.load(open(mp))
+                    detected_color = m.get('theme_color') or m.get('background_color')
+                    if detected_color: break
+                except: pass
+        if detected_color: break
+    # 2. Check HTML files for <meta name="theme-color">
+    if not detected_color:
+        for hname in ['index.html', 'public/index.html', 'src/index.html']:
+            hp = os.path.join(project, hname)
+            if os.path.isfile(hp):
+                try:
+                    html = open(hp).read()
+                    match = re.search(r'<meta[^>]*name=["\']theme-color["\'][^>]*content=["\'](#[0-9a-fA-F]{3,8})["\']', html)
+                    if not match:
+                        match = re.search(r'<meta[^>]*content=["\'](#[0-9a-fA-F]{3,8})["\'][^>]*name=["\']theme-color["\']', html)
+                    if match:
+                        detected_color = match.group(1)
+                        break
+                except: pass
+    if detected_color:
+        config['backgroundColor'] = detected_color
+        print(f'Auto-detected color: {detected_color}', file=sys.stderr)
+
+# Auto-detect name
 if not config.get('name'):
-    import os
-    pkg = os.path.join('''$PROJECT_DIR''', 'package.json')
+    pkg = os.path.join(project, 'package.json')
     if os.path.isfile(pkg):
         try:
             pname = json.load(open(pkg)).get('name', '')
             if pname: config['name'] = pname
         except: pass
     if not config.get('name'):
-        config['name'] = os.path.basename('''$PROJECT_DIR''')
+        config['name'] = os.path.basename(project)
+
 json.dump(config, sys.stdout, indent=2)
 print()
-" > "$CONFIG.tmp" && mv "$CONFIG.tmp" "$CONFIG"
+PYEOF
+  rm -f "$EXISTING_TMP"
+  mv "$CONFIG.tmp" "$CONFIG"
 
   echo "Initialized: $MANTEL_DIR/"
   cat "$CONFIG"
