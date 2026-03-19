@@ -585,7 +585,7 @@ ipcMain.on('open-in-finder', (_event, dirPath) => {
   if (typeof dirPath === 'string' && fs.existsSync(dirPath)) shell.openPath(dirPath);
 });
 
-// === Recent Folders ===
+// === Recent Directories ===
 
 function navigateToDir(dir) {
   const win = BrowserWindow.getFocusedWindow();
@@ -712,17 +712,17 @@ function buildMenu(pkg) {
         },
         { type: 'separator' },
         {
-          label: 'Recent Folders',
+          label: 'Recent Directories',
           submenu: (() => {
             const dirs = loadRecentDirs();
-            if (dirs.length === 0) return [{ label: 'No Recent Folders', enabled: false }];
+            if (dirs.length === 0) return [{ label: 'No Recent Directories', enabled: false }];
             const home = process.env.HOME || '';
             const items = dirs.map(dir => ({
               label: dir.startsWith(home) ? '~' + dir.slice(home.length) : dir,
               click: () => navigateToDir(dir),
             }));
             items.push({ type: 'separator' });
-            items.push({ label: 'Clear Recent Folders', click: () => { saveRecentDirs([]); rebuildMenuWithRecent(); } });
+            items.push({ label: 'Clear Recent Directories', click: () => { saveRecentDirs([]); rebuildMenuWithRecent(); } });
             return items;
           })(),
         },
