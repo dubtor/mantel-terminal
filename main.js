@@ -168,7 +168,7 @@ function hashColor(str) {
   return COLORS[Math.abs(hash) % COLORS.length];
 }
 
-const BASE_ICON_PATH = path.join(__dirname, 'icon.png');
+const BASE_ICON_PATH = path.join(__dirname.replace('app.asar', 'app.asar.unpacked'), 'icon.png');
 
 async function updateDockIcon(projectName, config, iconPath, emoji) {
   if (process.platform !== 'darwin') return;
