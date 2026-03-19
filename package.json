@@ -40,6 +40,9 @@
       "icon.png",
       "node_modules/**/*"
     ],
+    "extraResources": [
+      { "from": "mantel", "to": "mantel" }
+    ],
     "asarUnpack": [
       "icon.png",
       "node_modules/sharp/**/*",
