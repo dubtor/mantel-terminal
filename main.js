@@ -53,10 +53,8 @@ function addRecentDir(dir) {
 
 // Built-in themes
 const THEMES = {
-  'default': {
-    background: '#000000',
-    foreground: '#f7fbfc',
-    cursor: '#f7fbfc',
+  'Default': {
+    background: '#000000', foreground: '#f7fbfc', cursor: '#f7fbfc',
     selectionBackground: '#3e4d5b',
     black: '#000000', red: '#c91b00', green: '#00c200', yellow: '#c7c400',
     blue: '#0225c7', magenta: '#c930c7', cyan: '#00c5c7', white: '#c7c7c7',
@@ -64,7 +62,88 @@ const THEMES = {
     brightYellow: '#fffc67', brightBlue: '#6871ff', brightMagenta: '#ff76ff',
     brightCyan: '#60fdff', brightWhite: '#ffffff',
   },
-  'catppuccin': {
+  'Homebrew': {
+    background: '#000000', foreground: '#28fe14', cursor: '#38fe2c',
+    selectionBackground: '#083a9466',
+    black: '#000000', red: '#990000', green: '#00a600', yellow: '#999900',
+    blue: '#0000b2', magenta: '#b200b2', cyan: '#00a6b2', white: '#bfbfbf',
+    brightBlack: '#666666', brightRed: '#e50000', brightGreen: '#00d900',
+    brightYellow: '#e5e500', brightBlue: '#0000ff', brightMagenta: '#e500e5',
+    brightCyan: '#00e5e5', brightWhite: '#e5e5e5',
+  },
+  'Pro': {
+    background: '#000000', foreground: '#f2f2f2', cursor: '#4d4d4d',
+    selectionBackground: '#41414166',
+    black: '#000000', red: '#990000', green: '#00a600', yellow: '#999900',
+    blue: '#2009db', magenta: '#b200b2', cyan: '#00a6b2', white: '#bfbfbf',
+    brightBlack: '#666666', brightRed: '#e50000', brightGreen: '#00d900',
+    brightYellow: '#e5e500', brightBlue: '#0000ff', brightMagenta: '#e500e5',
+    brightCyan: '#00e5e5', brightWhite: '#e5e5e5',
+  },
+  'Ocean': {
+    background: '#224fbc', foreground: '#ffffff', cursor: '#7f7f7f',
+    selectionBackground: '#216dff66',
+    black: '#000000', red: '#990000', green: '#00a600', yellow: '#999900',
+    blue: '#0000b2', magenta: '#b200b2', cyan: '#00a6b2', white: '#bfbfbf',
+    brightBlack: '#666666', brightRed: '#e50000', brightGreen: '#00d900',
+    brightYellow: '#e5e500', brightBlue: '#0000ff', brightMagenta: '#e500e5',
+    brightCyan: '#00e5e5', brightWhite: '#e5e5e5',
+  },
+  'Solarized Dark': {
+    background: '#002b36', foreground: '#839496', cursor: '#93a1a1',
+    selectionBackground: '#073642',
+    black: '#073642', red: '#dc322f', green: '#859900', yellow: '#b58900',
+    blue: '#268bd2', magenta: '#d33682', cyan: '#2aa198', white: '#eee8d5',
+    brightBlack: '#586e75', brightRed: '#cb4b16', brightGreen: '#586e75',
+    brightYellow: '#657b83', brightBlue: '#839496', brightMagenta: '#6c71c4',
+    brightCyan: '#93a1a1', brightWhite: '#fdf6e3',
+  },
+  'Solarized Light': {
+    background: '#fdf6e3', foreground: '#657b83', cursor: '#586e75',
+    selectionBackground: '#eee8d5',
+    black: '#073642', red: '#dc322f', green: '#859900', yellow: '#b58900',
+    blue: '#268bd2', magenta: '#d33682', cyan: '#2aa198', white: '#eee8d5',
+    brightBlack: '#586e75', brightRed: '#cb4b16', brightGreen: '#586e75',
+    brightYellow: '#657b83', brightBlue: '#839496', brightMagenta: '#6c71c4',
+    brightCyan: '#93a1a1', brightWhite: '#fdf6e3',
+  },
+  'Dracula': {
+    background: '#282a36', foreground: '#f8f8f2', cursor: '#f8f8f2',
+    selectionBackground: '#44475a',
+    black: '#21222c', red: '#ff5555', green: '#50fa7b', yellow: '#f1fa8c',
+    blue: '#bd93f9', magenta: '#ff79c6', cyan: '#8be9fd', white: '#f8f8f2',
+    brightBlack: '#6272a4', brightRed: '#ff6e6e', brightGreen: '#69ff94',
+    brightYellow: '#ffffa5', brightBlue: '#d6acff', brightMagenta: '#ff92df',
+    brightCyan: '#a4ffff', brightWhite: '#ffffff',
+  },
+  'Nord': {
+    background: '#2e3440', foreground: '#d8dee9', cursor: '#d8dee9',
+    selectionBackground: '#434c5e',
+    black: '#3b4252', red: '#bf616a', green: '#a3be8c', yellow: '#ebcb8b',
+    blue: '#81a1c1', magenta: '#b48ead', cyan: '#88c0d0', white: '#e5e9f0',
+    brightBlack: '#4c566a', brightRed: '#bf616a', brightGreen: '#a3be8c',
+    brightYellow: '#ebcb8b', brightBlue: '#81a1c1', brightMagenta: '#b48ead',
+    brightCyan: '#8fbcbb', brightWhite: '#eceff4',
+  },
+  'Tokyo Night': {
+    background: '#1a1b26', foreground: '#c0caf5', cursor: '#c0caf5',
+    selectionBackground: '#33467c',
+    black: '#15161e', red: '#f7768e', green: '#9ece6a', yellow: '#e0af68',
+    blue: '#7aa2f7', magenta: '#bb9af7', cyan: '#7dcfff', white: '#a9b1d6',
+    brightBlack: '#414868', brightRed: '#f7768e', brightGreen: '#9ece6a',
+    brightYellow: '#e0af68', brightBlue: '#7aa2f7', brightMagenta: '#bb9af7',
+    brightCyan: '#7dcfff', brightWhite: '#c0caf5',
+  },
+  'One Dark': {
+    background: '#282c34', foreground: '#abb2bf', cursor: '#528bff',
+    selectionBackground: '#3e4451',
+    black: '#282c34', red: '#e06c75', green: '#98c379', yellow: '#e5c07b',
+    blue: '#61afef', magenta: '#c678dd', cyan: '#56b6c2', white: '#abb2bf',
+    brightBlack: '#5c6370', brightRed: '#e06c75', brightGreen: '#98c379',
+    brightYellow: '#e5c07b', brightBlue: '#61afef', brightMagenta: '#c678dd',
+    brightCyan: '#56b6c2', brightWhite: '#ffffff',
+  },
+  'Catppuccin': {
     background: '#1e1e2e', foreground: '#cdd6f4', cursor: '#f5e0dc',
     selectionBackground: '#585b7066',
     black: '#45475a', red: '#f38ba8', green: '#a6e3a1', yellow: '#f9e2af',
@@ -80,21 +159,39 @@ function loadTheme() {
   try {
     if (fs.existsSync(themePath)) {
       const data = JSON.parse(fs.readFileSync(themePath, 'utf8'));
-      // If it's a string, treat as preset name
-      if (typeof data === 'string') return THEMES[data] || THEMES['default'];
-      // If it has a "preset" key, merge preset with overrides
-      if (data.preset && THEMES[data.preset]) {
-        const { preset, ...overrides } = data;
-        return { ...THEMES[preset], ...overrides };
+      if (typeof data === 'string') {
+        const name = Object.keys(THEMES).find(k => k.toLowerCase() === data.toLowerCase()) || 'Default';
+        return { name, theme: THEMES[name] || THEMES['Default'] };
       }
-      // Otherwise it's a full custom theme — merge with default as base
-      return { ...THEMES['default'], ...data };
+      if (data.preset) {
+        const name = Object.keys(THEMES).find(k => k.toLowerCase() === data.preset.toLowerCase()) || 'Default';
+        const { preset, ...overrides } = data;
+        return { name: null, theme: { ...(THEMES[name] || THEMES['Default']), ...overrides } };
+      }
+      return { name: null, theme: { ...THEMES['Default'], ...data } };
     }
   } catch (_e) { /* ignore */ }
-  return THEMES['default'];
+  return { name: 'Default', theme: THEMES['Default'] };
 }
 
-const terminalTheme = loadTheme();
+let { name: currentThemeName, theme: terminalTheme } = loadTheme();
+
+function setTheme(name) {
+  if (!THEMES[name]) return;
+  currentThemeName = name;
+  terminalTheme = THEMES[name];
+  // Save preference
+  try {
+    fs.mkdirSync(MANTEL_HOME, { recursive: true });
+    fs.writeFileSync(path.join(MANTEL_HOME, 'theme.json'), JSON.stringify(name));
+  } catch (_e) { /* ignore */ }
+  // Apply to all windows
+  for (const win of BrowserWindow.getAllWindows()) {
+    win.webContents.send('set-theme', terminalTheme);
+    win.setBackgroundColor(terminalTheme.background);
+  }
+  rebuildMenuWithRecent();
+}
 const IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.ico'];
 
 function detectGitInfo(cwd) {
@@ -1106,6 +1203,16 @@ function buildMenu(pkg) {
         { label: 'Bigger', accelerator: 'CmdOrCtrl+=', click: (_item, win) => { if (win) win.webContents.send('menu-zoom', 'in'); } },
         { label: 'Smaller', accelerator: 'CmdOrCtrl+-', click: (_item, win) => { if (win) win.webContents.send('menu-zoom', 'out'); } },
         { label: 'Default Size', accelerator: 'CmdOrCtrl+0', click: (_item, win) => { if (win) win.webContents.send('menu-zoom', 'reset'); } },
+        { type: 'separator' },
+        {
+          label: 'Theme',
+          submenu: Object.keys(THEMES).map(name => ({
+            label: name,
+            type: 'radio',
+            checked: name === currentThemeName,
+            click: () => setTheme(name),
+          })),
+        },
         { type: 'separator' },
         { role: 'togglefullscreen' },
       ],
