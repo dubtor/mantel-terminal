@@ -9,7 +9,7 @@ app.setName('Mantel');
 app.setAboutPanelOptions({
   applicationName: 'Mantel',
   applicationVersion: require('./package.json').version,
-  copyright: '© 2026 Robert Clemens (@dubtor), 83 Ventures',
+  copyright: '© 2026 Robert Clemens (@dubtor), 83 Ventures\nhttps://www.83ventures.io',
   iconPath: path.join(__dirname.replace('app.asar', 'app.asar.unpacked'), 'icon.png'),
 });
 
@@ -378,6 +378,11 @@ function createTab(windowId, cwd, opts = {}) {
   ptyProc.onData((data) => {
     if (!entry.window.isDestroyed()) {
       entry.window.webContents.send('terminal-data', tabId, data);
+      // Bounce dock icon and show badge on bell character when app is not focused (like Terminal.app)
+      if (data.includes('\x07') && !BrowserWindow.getFocusedWindow()) {
+        app.dock.bounce('informational');
+        app.dock.setBadge('!');
+      }
     }
   });
 
@@ -572,6 +577,11 @@ function createWindow(startDir) {
       }
     }
     windows.delete(win.id);
+  });
+
+  // Clear dock badge when window regains focus
+  win.on('focus', () => {
+    app.dock.setBadge('');
   });
 
   return win;
@@ -769,7 +779,19 @@ function installCLI() {
     return;
   }
 
-  const script = `#!/bin/bash\nopen -n -a "${appPath}" --args "$@"\n`;
+  const bundledScript = path.join(appPath, 'Contents', 'Resources', 'mantel');
+  const script = [
+    '#!/bin/bash',
+    '# Mantel CLI — installed by Mantel.app',
+    `BUNDLED_SCRIPT="${bundledScript}"`,
+    '',
+    'if [ "$1" = "init" ]; then',
+    '  exec "$BUNDLED_SCRIPT" "$@"',
+    'fi',
+    '',
+    `open -n -a "${appPath}" --args "$@"`,
+    '',
+  ].join('\n');
 
   try {
     fs.mkdirSync('/usr/local/bin', { recursive: true });
