@@ -457,11 +457,13 @@
         if (tab.titleSpan) tab.titleSpan.style.opacity = isActive ? '1' : '0.6';
       }
       const filler = document.getElementById('tab-filler');
-      const activeTab = tabs.get(activeTabId);
-      if (activeTab && activeTab.projectInfo) {
-        const cfg = activeTab.projectInfo.config;
+      // Use the last (rightmost) tab's color for the filler area
+      const tabOrder = [...tabs.values()].filter(t => t.tabButton);
+      const lastTab = tabOrder.length > 0 ? tabOrder[tabOrder.length - 1] : null;
+      if (lastTab && lastTab.projectInfo) {
+        const cfg = lastTab.projectInfo.config;
         const hasConfig = cfg && cfg.backgroundColor;
-        const bg = hasConfig ? cfg.backgroundColor : hashColor(activeTab.projectInfo.projectName);
+        const bg = hasConfig ? cfg.backgroundColor : hashColor(lastTab.projectInfo.projectName);
         filler.style.background = bg;
         filler.style.opacity = '0.9';
         filler.style.filter = 'brightness(0.9)';
