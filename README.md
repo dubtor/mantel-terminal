@@ -43,7 +43,7 @@ Any project works out of the box with auto-generated colors. To customize, creat
 
 ```bash
 # Quick setup via CLI
-./mantel init --name "My Project" --background-color "#1a56db" --text-color "#ffffff" --icon ./logo.png
+./mantel init --name "My Project" --background-color "#1a56db" --icon ./logo.png
 
 # Or manually
 mkdir .mantel
@@ -65,6 +65,8 @@ mkdir .mantel
 | `icon` | Path to icon file, relative to project root. Supports png, jpg, svg, webp, gif, ico |
 
 `mantel init` automatically populates `name` from `package.json` and detects common icon files (`favicon`, `logo`, `icon`, etc.) up to 3 directories deep when `--name` or `--icon` are not provided.
+
+Use `mantel init --force` to re-run auto-detection for all fields, even if a config already exists. Fields explicitly passed in the same command (e.g. `--name`) are kept; everything else is re-detected.
 
 ## Theme
 

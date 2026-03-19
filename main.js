@@ -258,6 +258,29 @@ async function updateDockIcon(projectName, config, iconPath, emoji) {
   }
 }
 
+// Count all tabs with unread bell notifications and update the dock badge
+function updateBellBadge() {
+  let total = 0;
+  for (const [, entry] of windows) {
+    for (const [, tab] of entry.tabs) {
+      if (tab.hasBell) total++;
+    }
+  }
+  app.dock.setBadge(total > 0 ? String(total) : '');
+}
+
+// Clear bell for a specific tab and update badge
+function clearTabBell(windowId, tabId) {
+  const entry = windows.get(windowId);
+  if (!entry) return;
+  const tab = entry.tabs.get(tabId);
+  if (tab && tab.hasBell) {
+    tab.hasBell = false;
+    entry.window.webContents.send('tab-bell-clear', tabId);
+    updateBellBadge();
+  }
+}
+
 const SPECIAL_DIR_ICONS = {
   home: (color) => `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>`,
   desktop: (color) => `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>`,
@@ -378,10 +401,20 @@ function createTab(windowId, cwd, opts = {}) {
   ptyProc.onData((data) => {
     if (!entry.window.isDestroyed()) {
       entry.window.webContents.send('terminal-data', tabId, data);
-      // Bounce dock icon and show badge on bell character when app is not focused (like Terminal.app)
-      if (data.includes('\x07') && !BrowserWindow.getFocusedWindow()) {
-        app.dock.bounce('informational');
-        app.dock.setBadge('!');
+      // Bell notification: ignore if this is the active tab of the focused window
+      if (data.includes('\x07')) {
+        const isActiveInFocusedWindow = entry.activeTabId === tabId && entry.window.isFocused();
+        if (!isActiveInFocusedWindow) {
+          const tab = entry.tabs.get(tabId);
+          if (tab && !tab.hasBell) {
+            tab.hasBell = true;
+            entry.window.webContents.send('tab-bell', tabId);
+            if (!entry.window.isFocused()) {
+              app.dock.bounce('informational');
+            }
+            updateBellBadge();
+          }
+        }
       }
     }
   });
@@ -579,9 +612,12 @@ function createWindow(startDir) {
     windows.delete(win.id);
   });
 
-  // Clear dock badge when window regains focus
+  // Clear bell for active tab when window regains focus
   win.on('focus', () => {
-    app.dock.setBadge('');
+    const entry = windows.get(win.id);
+    if (entry && entry.activeTabId) {
+      clearTabBell(win.id, entry.activeTabId);
+    }
   });
 
   return win;
@@ -654,6 +690,7 @@ ipcMain.on('set-active-tab', (event, tabId) => {
   const entry = windows.get(win.id);
   if (!entry) return;
   entry.activeTabId = tabId;
+  clearTabBell(win.id, tabId);
   // Update dock icon for the newly active tab
   const tab = entry.tabs.get(tabId);
   if (tab) {

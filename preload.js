@@ -9,6 +9,8 @@ contextBridge.exposeInMainWorld('terminalAPI', {
   onTabCreated: (cb) => ipcRenderer.on('tab-created', (_e, payload) => cb(payload)),
   onTabClosed: (cb) => ipcRenderer.on('tab-closed', (_e, tabId) => cb(tabId)),
   onTabTitle: (cb) => ipcRenderer.on('tab-title', (_e, tabId, title) => cb(tabId, title)),
+  onTabBell: (cb) => ipcRenderer.on('tab-bell', (_e, tabId) => cb(tabId)),
+  onTabBellClear: (cb) => ipcRenderer.on('tab-bell-clear', (_e, tabId) => cb(tabId)),
 
   // Terminal I/O (per tab)
   onData: (cb) => ipcRenderer.on('terminal-data', (_e, tabId, data) => cb(tabId, data)),
