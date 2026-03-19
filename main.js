@@ -406,20 +406,18 @@ function createTab(windowId, cwd, opts = {}) {
         }
       }
 
-      if ((detectedCwd !== lastCwd && fs.existsSync(detectedCwd)) || configChanged) {
+      const cwdChanged = detectedCwd !== lastCwd && fs.existsSync(detectedCwd);
+      if (cwdChanged || configChanged) {
         lastCwd = detectedCwd;
-        addRecentDir(detectedCwd);
+        if (cwdChanged) addRecentDir(detectedCwd);
         const payload = buildProjectPayload(detectedCwd);
         entry.window.webContents.send('update-project', tabId, {
           cwd: payload.cwd, iconData: payload.iconData,
           projectName: payload.projectName, config: payload.config, gitInfo: payload.gitInfo,
         });
-        // Update tab title
         entry.window.webContents.send('tab-title', tabId, path.basename(detectedCwd));
         if (entry.activeTabId === tabId) {
-          if (entry.window.isFocused()) {
-            updateDockIcon(payload.projectName, payload.config, payload.iconPath, payload.specialIcon);
-          }
+          updateDockIcon(payload.projectName, payload.config, payload.iconPath, payload.specialIcon);
           updateMenuForDirectory(detectedCwd);
         }
       }

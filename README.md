@@ -53,12 +53,20 @@ mkdir .mantel
 ```json
 {
   "name": "My Project",
-  "color": "#1a56db",
-  "textColor": "#ffffff"
+  "backgroundColor": "#1a56db",
+  "textColor": "#ffffff",
+  "icon": "assets/logo.png"
 }
 ```
 
-Add an `icon.png` (or `.svg`, `.jpg`, `.webp`) to `.mantel/` for a custom project icon.
+| Field | Description |
+|---|---|
+| `name` | Project display name. Without it, the directory name is shown |
+| `backgroundColor` | Tab bar and info bar background color (hex). Falls back to auto-generated color |
+| `textColor` | Text color (hex). Falls back to black/white based on background brightness |
+| `icon` | Path to icon file, relative to project root. Supports png, jpg, svg, webp, gif, ico |
+
+`mantel init` automatically populates `name` from `package.json` and detects common icon files (`favicon`, `logo`, `icon`, etc.) up to 3 directories deep when `--name` or `--icon` are not provided.
 
 ## Theme
 
