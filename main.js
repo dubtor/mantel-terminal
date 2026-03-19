@@ -358,6 +358,7 @@ function createTab(windowId, cwd, opts = {}) {
   let lastCwd = cwd;
   let lastSSHHost = null;
   let lastConfigMtime = 0;
+  let lastPkgMtime = 0;
   const pollInterval = setInterval(() => {
     try {
       const pid = ptyProc.pid;
@@ -390,7 +391,7 @@ function createTab(windowId, cwd, opts = {}) {
       const detectedCwd = getTabCwd(currentTab);
       if (!detectedCwd) return;
 
-      // Check if .mantel/config.json has been modified
+      // Check if .mantel/config.json or package.json has been modified
       let configChanged = false;
       if (detectedCwd === lastCwd) {
         const { projectRoot } = findProjectConfig(detectedCwd);
@@ -403,6 +404,17 @@ function createTab(windowId, cwd, opts = {}) {
               configChanged = true;
             }
           } catch (_e) { /* no config file */ }
+        }
+        const pkg = findPackageScripts(detectedCwd);
+        if (pkg) {
+          const pkgPath = path.join(pkg.root, 'package.json');
+          try {
+            const mtime = fs.statSync(pkgPath).mtimeMs;
+            if (mtime !== lastPkgMtime) {
+              lastPkgMtime = mtime;
+              configChanged = true;
+            }
+          } catch (_e) { /* */ }
         }
       }
 
@@ -604,6 +616,16 @@ ipcMain.on('navigate-to-dir', (_event, dir) => {
 });
 
 ipcMain.handle('get-recent-dirs', () => loadRecentDirs());
+
+ipcMain.handle('get-scripts', (_event, cwd) => {
+  const pkg = findPackageScripts(cwd);
+  if (!pkg) return null;
+  return { scripts: pkg.scripts, manager: pkg.manager };
+});
+
+ipcMain.on('run-script', (_event, command) => {
+  runScriptInNewTab(command);
+});
 
 // === Run Menu ===
 

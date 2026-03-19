@@ -24,6 +24,8 @@ contextBridge.exposeInMainWorld('terminalAPI', {
   openInFinder: (dirPath) => ipcRenderer.send('open-in-finder', dirPath),
   getRecentDirs: () => ipcRenderer.invoke('get-recent-dirs'),
   navigateToDir: (dir) => ipcRenderer.send('navigate-to-dir', dir),
+  getScripts: (cwd) => ipcRenderer.invoke('get-scripts', cwd),
+  runScript: (command) => ipcRenderer.send('run-script', command),
 
   // Theme
   onSetTheme: (cb) => ipcRenderer.on('set-theme', (_e, theme) => cb(theme)),

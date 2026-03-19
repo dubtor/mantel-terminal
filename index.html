@@ -77,7 +77,7 @@
     #project-path-row {
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 12px;
     }
 
     .action-icon {
@@ -86,6 +86,7 @@
       transition: opacity 0.15s;
       -webkit-app-region: no-drag;
       flex-shrink: 0;
+      padding: 4px;
     }
     .action-icon:hover { opacity: 1; }
     .action-icon svg { display: block; }
@@ -118,6 +119,31 @@
       padding: 6px 12px;
       font-size: 12px;
       color: rgba(255,255,255,0.35);
+    }
+
+    #run-scripts-dropdown {
+      position: fixed;
+      min-width: 200px;
+      max-height: 300px;
+      overflow-y: auto;
+      background: #1e1e2e;
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 6px;
+      padding: 4px 0;
+      z-index: 1000;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+    }
+    #run-scripts-dropdown .script-item {
+      padding: 6px 12px;
+      font-size: 12px;
+      color: #cdd6f4;
+      cursor: pointer;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    #run-scripts-dropdown .script-item:hover {
+      background: rgba(255,255,255,0.08);
     }
 
     #infobar-git {
@@ -301,16 +327,20 @@
                 <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
               </svg>
             </span>
-            <span id="open-finder" class="action-icon" title="Open in Finder">
+            <span id="open-finder" class="action-icon" title="Reveal in Finder">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
               </svg>
             </span>
-            <span id="recent-dirs-toggle" class="action-icon" title="Recent directories" style="position:relative;">
+            <span id="recent-dirs-toggle" class="action-icon" title="Recent Directories">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <polyline points="6 9 12 15 18 9"/>
               </svg>
-              <div id="recent-dirs-dropdown" style="display:none;"></div>
+            </span>
+            <span id="run-scripts-toggle" class="action-icon" title="Run Script" style="display:none;">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polygon points="5 3 19 12 5 21 5 3"/>
+              </svg>
             </span>
           </div>
         </div>
@@ -524,7 +554,7 @@
       updateTabBarVisibility();
     }
 
-    function updateInfobar(payload) {
+    async function updateInfobar(payload) {
       const { cwd, iconData, projectName, config, gitInfo } = payload;
       const infobar = document.getElementById('infobar');
       const icon = document.getElementById('project-icon');
@@ -582,6 +612,7 @@
       recentToggle.style.color = subTextColor;
       recentToggle.onclick = async (e) => {
         e.stopPropagation();
+        document.getElementById('run-scripts-dropdown').style.display = 'none';
         if (recentDropdown.style.display !== 'none') {
           recentDropdown.style.display = 'none';
           return;
@@ -609,11 +640,51 @@
         }
         recentDropdown.style.display = 'block';
       };
-      if (!window._recentDirClickHandler) {
-        window._recentDirClickHandler = true;
+      if (!window._dropdownClickHandler) {
+        window._dropdownClickHandler = true;
         document.addEventListener('click', () => {
           document.getElementById('recent-dirs-dropdown').style.display = 'none';
+          document.getElementById('run-scripts-dropdown').style.display = 'none';
         });
+        document.getElementById('recent-dirs-dropdown').addEventListener('click', (e) => e.stopPropagation());
+        document.getElementById('run-scripts-dropdown').addEventListener('click', (e) => e.stopPropagation());
+      }
+
+      // Run scripts button
+      const runToggle = document.getElementById('run-scripts-toggle');
+      const runDropdown = document.getElementById('run-scripts-dropdown');
+      const scriptsData = await window.terminalAPI.getScripts(cwd);
+      if (scriptsData && scriptsData.scripts) {
+        runToggle.style.display = '';
+        runToggle.style.color = subTextColor;
+        runToggle.onclick = async (e) => {
+          e.stopPropagation();
+          recentDropdown.style.display = 'none';
+          if (runDropdown.style.display !== 'none') {
+            runDropdown.style.display = 'none';
+            return;
+          }
+          const rect = runToggle.getBoundingClientRect();
+          runDropdown.style.top = (rect.bottom + 6) + 'px';
+          runDropdown.style.left = rect.left + 'px';
+          runDropdown.innerHTML = '';
+          const prefix = scriptsData.manager === 'yarn' ? 'yarn' : 'npm run';
+          Object.keys(scriptsData.scripts).forEach(name => {
+            const item = document.createElement('div');
+            item.className = 'script-item';
+            item.textContent = name;
+            item.title = scriptsData.scripts[name];
+            item.onclick = (ev) => {
+              ev.stopPropagation();
+              runDropdown.style.display = 'none';
+              window.terminalAPI.runScript(`${prefix} ${name}`);
+            };
+            runDropdown.appendChild(item);
+          });
+          runDropdown.style.display = 'block';
+        };
+      } else {
+        runToggle.style.display = 'none';
       }
 
       // Git
@@ -762,5 +833,7 @@
     // Boot
     window.terminalAPI.ready();
   </script>
+  <div id="recent-dirs-dropdown" style="display:none;"></div>
+  <div id="run-scripts-dropdown" style="display:none;"></div>
 </body>
 </html>
