@@ -30,6 +30,7 @@
       display: flex;
       align-items: center;
       transition: opacity 0.3s ease;
+      -webkit-app-region: drag;
     }
 
     #infobar-content {
@@ -37,7 +38,7 @@
       align-items: flex-end;
       width: 100%;
       height: 100%;
-      padding: 0 0 7px 16px;
+      padding: 0 0 7px 8px;
       gap: 12px;
     }
 
@@ -189,25 +190,46 @@
       text-overflow: ellipsis;
     }
 
-    /* Tab bar */
+    /* Tab bar — always visible, replaces native title bar */
     #tab-bar {
-      display: none;
-      height: 30px;
-      min-height: 30px;
+      display: flex;
+      height: 28px;
+      min-height: 28px;
       align-items: stretch;
       overflow-x: auto;
       -webkit-app-region: drag;
+      padding-left: 76px;
+      position: relative;
+      background: #1e1e2e;
     }
 
     #tab-bar::-webkit-scrollbar { display: none; }
 
-    #tab-bar.visible { display: flex; }
+    /* Centered window title overlay */
+    #tab-bar-title {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: 500;
+      color: rgba(255,255,255,0.7);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Hide title when multiple tabs are shown */
+    #tab-bar.multi-tab #tab-bar-title { display: none; }
 
     .tab-button {
       display: flex;
       align-items: center;
       gap: 6px;
-      padding: 0 14px;
+      padding: 0 8px 0 11px;
       font-size: 11px;
       font-weight: 500;
       cursor: pointer;
@@ -215,8 +237,41 @@
       flex-shrink: 1;
       min-width: 60px;
       -webkit-app-region: no-drag;
-      transition: filter 0.15s;
-      border-right: 1px solid rgba(0,0,0,0.15);
+      transition: filter 0.15s, background 0.15s, border-radius 0.15s;
+      position: relative;
+      z-index: 1;
+      border-radius: 8px 8px 0 0;
+      margin-top: auto;
+      border: none;
+      height: calc(100% - 5px);
+    }
+
+    .tab-button.active {
+      z-index: 2;
+      height: calc(100% - 1px);
+      margin-bottom: -2px;
+      padding-bottom: 2px;
+    }
+
+    /* Curved connectors for active tab */
+    .tab-button.active::before,
+    .tab-button.active::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      width: 8px;
+      height: 8px;
+      z-index: 2;
+    }
+    .tab-button.active::before {
+      left: -8px;
+      border-radius: 0 0 8px 0;
+      box-shadow: 2px 0 0 0 var(--tab-active-bg);
+    }
+    .tab-button.active::after {
+      right: -8px;
+      border-radius: 0 0 0 8px;
+      box-shadow: -2px 0 0 0 var(--tab-active-bg);
     }
 
     .tab-title {
@@ -236,6 +291,7 @@
       opacity: 0;
       flex-shrink: 0;
       transition: opacity 0.1s, background 0.1s;
+      -webkit-app-region: no-drag;
     }
 
     .tab-bell-badge {
@@ -270,6 +326,8 @@
       flex: 1;
       display: flex;
       align-items: center;
+      position: relative;
+      z-index: 1;
       padding-left: 10px;
       min-width: 40px;
     }
@@ -325,6 +383,7 @@
 <body>
   <div id="app">
     <div id="tab-bar">
+      <div id="tab-bar-title">Terminal</div>
       <div id="tab-filler">
         <div id="tab-filler-add" title="New Tab">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
@@ -411,6 +470,12 @@
       const r = parseInt(hex.slice(1, 3), 16), g = parseInt(hex.slice(3, 5), 16), b = parseInt(hex.slice(5, 7), 16);
       return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.6;
     }
+    function darkenColor(hex, factor = 0.7) {
+      const r = Math.round(parseInt(hex.slice(1, 3), 16) * factor);
+      const g = Math.round(parseInt(hex.slice(3, 5), 16) * factor);
+      const b = Math.round(parseInt(hex.slice(5, 7), 16) * factor);
+      return '#' + [r, g, b].map(c => c.toString(16).padStart(2, '0')).join('');
+    }
     function shortenPath(p) { return p.replace(/^\/Users\/[^/]+/, '~'); }
 
     // Default theme (overridden by main process via set-theme)
@@ -435,7 +500,12 @@
 
     function updateTabBarVisibility() {
       const multi = tabs.size > 1;
-      tabBar.classList.toggle('visible', multi);
+      tabBar.classList.toggle('multi-tab', multi);
+      // In single-tab mode, hide individual tab buttons
+      for (const [, tab] of tabs) {
+        if (tab.tabButton) tab.tabButton.style.display = multi ? '' : 'none';
+      }
+      document.getElementById('tab-filler-add').style.display = multi ? '' : 'none';
       document.getElementById('infobar-add').style.display = multi ? 'none' : '';
       // Sync infobar bell badge with single/multi tab mode
       const infobarBadge = document.getElementById('infobar-bell-badge');
@@ -460,6 +530,22 @@
     }
 
     function updateTabColors() {
+      // Determine the active tab's brand color for the tab-bar background
+      const activeTab = tabs.get(activeTabId);
+      let barBg = '#1e1e2e';
+      let barLight = false;
+      if (activeTab && activeTab.projectInfo) {
+        const cfg = activeTab.projectInfo.config;
+        const hasConfig = cfg && cfg.backgroundColor;
+        barBg = hasConfig ? cfg.backgroundColor : hashColor(activeTab.projectInfo.projectName);
+        barLight = isLightColor(barBg);
+      }
+      // Tab bar gets a dimmed version of the brand color (no CSS filter, so children aren't affected)
+      tabBar.style.background = darkenColor(barBg, 0.9);
+      tabBar.style.filter = 'none';
+      const titleEl = document.getElementById('tab-bar-title');
+      titleEl.style.color = barLight ? 'rgba(0,0,0,0.6)' : 'rgba(255,255,255,0.7)';
+
       for (const [tid, tab] of tabs) {
         if (!tab.tabButton || !tab.projectInfo) continue;
         const cfg = tab.projectInfo.config;
@@ -467,26 +553,25 @@
         const bgColor = hasConfig ? cfg.backgroundColor : hashColor(tab.projectInfo.projectName);
         const light = isLightColor(bgColor);
         const isActive = tid === activeTabId;
-        tab.tabButton.style.background = bgColor;
+        if (isActive) {
+          // Active tab: exact brand color, set CSS var for pseudo-element connectors
+          tab.tabButton.style.background = bgColor;
+          tab.tabButton.style.setProperty('--tab-active-bg', bgColor);
+          tab.tabButton.style.filter = 'none';
+          tab.tabButton.style.opacity = '1';
+        } else {
+          // Inactive: own brand color, same darkening as tab-bar background
+          tab.tabButton.style.background = darkenColor(bgColor, 0.9);
+          tab.tabButton.style.filter = 'none';
+          tab.tabButton.style.opacity = '1';
+        }
         tab.tabButton.style.color = light ? '#1e1e2e' : '#ffffff';
-        tab.tabButton.style.opacity = isActive ? '1' : '0.9';
-        tab.tabButton.style.filter = isActive ? 'none' : 'brightness(0.9)';
-        if (tab.titleSpan) tab.titleSpan.style.opacity = isActive ? '1' : '0.6';
+        if (tab.titleSpan) tab.titleSpan.style.opacity = isActive ? '1' : '0.65';
       }
       const filler = document.getElementById('tab-filler');
-      // Use the last (rightmost) tab's color for the filler area
-      const tabOrder = [...tabs.values()].filter(t => t.tabButton);
-      const lastTab = tabOrder.length > 0 ? tabOrder[tabOrder.length - 1] : null;
-      if (lastTab && lastTab.projectInfo) {
-        const cfg = lastTab.projectInfo.config;
-        const hasConfig = cfg && cfg.backgroundColor;
-        const bg = hasConfig ? cfg.backgroundColor : hashColor(lastTab.projectInfo.projectName);
-        filler.style.background = bg;
-        filler.style.opacity = '0.9';
-        filler.style.filter = 'brightness(0.9)';
-        const light = isLightColor(bg);
-        document.getElementById('tab-filler-add').style.color = light ? '#1e1e2e' : '#ffffff';
-      }
+      filler.style.background = 'transparent';
+      const fillerAdd = document.getElementById('tab-filler-add');
+      fillerAdd.style.color = barLight ? '#1e1e2e' : '#ffffff';
     }
 
     function switchToTab(tabId) {
@@ -508,6 +593,12 @@
         tab.terminal.focus();
       }, 20);
       if (tab.projectInfo) updateInfobar(tab.projectInfo);
+      // Update title bar with current tab's title
+      if (tab.titleSpan) {
+        const title = tab.titleSpan.textContent || 'Terminal';
+        document.getElementById('tab-bar-title').textContent = title;
+        window.terminalAPI.setTitle(title);
+      }
       updateTabColors();
     }
 
@@ -529,7 +620,10 @@
       terminal.open(container);
 
       terminal.onTitleChange((title) => {
-        if (tabId === activeTabId) window.terminalAPI.setTitle(title);
+        if (tabId === activeTabId) {
+          window.terminalAPI.setTitle(title);
+          document.getElementById('tab-bar-title').textContent = title;
+        }
         const t = tabs.get(tabId);
         if (t && t.titleSpan) t.titleSpan.textContent = title;
       });
@@ -555,7 +649,35 @@
       tabButton.appendChild(titleSpan);
       tabButton.appendChild(bellBadge);
       tabButton.appendChild(closeBtn);
-      tabButton.addEventListener('click', () => switchToTab(tabId));
+      // Manual drag-or-click: distinguish window dragging from tab switching
+      tabButton.addEventListener('mousedown', (e) => {
+        if (e.button !== 0) return; // only left button
+        const startX = e.screenX, startY = e.screenY;
+        let dragging = false;
+        const THRESHOLD = 5;
+
+        const onMove = (ev) => {
+          const dx = ev.screenX - startX, dy = ev.screenY - startY;
+          if (!dragging && (Math.abs(dx) > THRESHOLD || Math.abs(dy) > THRESHOLD)) {
+            dragging = true;
+            window.terminalAPI.windowDragStart();
+          }
+          if (dragging) window.terminalAPI.windowDragMove();
+        };
+
+        const onUp = () => {
+          document.removeEventListener('mousemove', onMove);
+          document.removeEventListener('mouseup', onUp);
+          if (dragging) {
+            window.terminalAPI.windowDragEnd();
+          } else {
+            switchToTab(tabId);
+          }
+        };
+
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onUp);
+      });
       tabButton.addEventListener('contextmenu', (e) => {
         e.preventDefault();
         window.terminalAPI.showTabContextMenu(tabId);

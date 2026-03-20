@@ -300,19 +300,8 @@ async function updateDockIcon(projectName, config, iconPath, emoji, programBaseI
 
     let badgeBuffer;
     if (iconPath) {
-      const bgColor = (config && config.backgroundColor) || hashColor(projectName);
-      const r = badgeSize / 2;
-      const iconPadding = Math.round(badgeSize * 0.15);
-      const iconInnerSize = badgeSize - iconPadding * 2;
-      const bgSvg = `<svg width="${badgeSize}" height="${badgeSize}" xmlns="http://www.w3.org/2000/svg">
-        <circle cx="${r}" cy="${r}" r="${r - 1}" fill="${bgColor}" stroke="rgba(255,255,255,0.15)" stroke-width="${strokeWidth}"/>
-      </svg>`;
-      const bgBuffer = await sharp(Buffer.from(bgSvg)).png().toBuffer();
-      const iconResized = await sharp(iconPath)
-        .resize(iconInnerSize, iconInnerSize, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
-        .png().toBuffer();
-      badgeBuffer = await sharp(bgBuffer)
-        .composite([{ input: iconResized, left: iconPadding, top: iconPadding }])
+      badgeBuffer = await sharp(iconPath)
+        .resize(badgeSize, badgeSize, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
         .png().toBuffer();
     } else if (emoji && SPECIAL_DIR_ICONS[emoji]) {
       const bgColor = hashColor(projectName);
@@ -697,7 +686,8 @@ function createWindow(startDir) {
     height: 700,
     minWidth: 400,
     minHeight: 300,
-    titleBarStyle: 'default',
+    titleBarStyle: 'hidden',
+    trafficLightPosition: { x: 10, y: 7 },
     backgroundColor: terminalTheme.background,
     webPreferences: {
       nodeIntegration: false,
@@ -873,6 +863,35 @@ ipcMain.on('open-external', (_event, url) => {
 
 ipcMain.on('open-in-finder', (_event, dirPath) => {
   if (typeof dirPath === 'string' && fs.existsSync(dirPath)) shell.openPath(dirPath);
+});
+
+ipcMain.on('window-drag-start', (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (win && !win.isDestroyed()) {
+    const { screen } = require('electron');
+    const cursor = screen.getCursorScreenPoint();
+    const bounds = win.getBounds();
+    win._dragState = { offsetX: cursor.x - bounds.x, offsetY: cursor.y - bounds.y };
+  }
+});
+
+ipcMain.on('window-drag-move', (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (win && !win.isDestroyed() && win._dragState) {
+    const { screen } = require('electron');
+    const cursor = screen.getCursorScreenPoint();
+    win.setBounds({
+      x: cursor.x - win._dragState.offsetX,
+      y: cursor.y - win._dragState.offsetY,
+      width: win.getBounds().width,
+      height: win.getBounds().height,
+    });
+  }
+});
+
+ipcMain.on('window-drag-end', (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (win && !win.isDestroyed()) win._dragState = null;
 });
 
 // === Recent Directories ===

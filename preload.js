@@ -47,6 +47,11 @@ contextBridge.exposeInMainWorld('terminalAPI', {
   // Tab context menu
   showTabContextMenu: (tabId) => ipcRenderer.send('tab-context-menu', tabId),
 
+  // Window dragging (for custom titlebar regions that also need click handling)
+  windowDragStart: () => ipcRenderer.send('window-drag-start'),
+  windowDragMove: () => ipcRenderer.send('window-drag-move'),
+  windowDragEnd: () => ipcRenderer.send('window-drag-end'),
+
   // File utilities
   getPathForFile: (file) => webUtils.getPathForFile(file),
 });
