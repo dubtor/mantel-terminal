@@ -895,6 +895,22 @@
       }
     });
 
+    // Drag & drop files onto the terminal — insert escaped path (matches macOS Terminal.app)
+    document.addEventListener('dragover', (e) => {
+      e.preventDefault();
+    });
+    document.addEventListener('drop', (e) => {
+      e.preventDefault();
+      const files = e.dataTransfer.files;
+      if (!files || files.length === 0) return;
+      const paths = Array.from(files).map(f => {
+        const filePath = window.terminalAPI.getPathForFile(f);
+        // Escape special shell characters (spaces, parens, quotes, etc.)
+        return filePath.replace(/[ \\!"#$&'()*,:;<>?@\[\]^`{|}~]/g, '\\$&');
+      });
+      window.terminalAPI.sendInput(activeTabId, paths.join(' '));
+    });
+
     // Boot
     window.terminalAPI.ready();
   </script>

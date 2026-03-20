@@ -1,4 +1,4 @@
-const { contextBridge, ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
 contextBridge.exposeInMainWorld('terminalAPI', {
   // Tab lifecycle
@@ -46,4 +46,7 @@ contextBridge.exposeInMainWorld('terminalAPI', {
 
   // Tab context menu
   showTabContextMenu: (tabId) => ipcRenderer.send('tab-context-menu', tabId),
+
+  // File utilities
+  getPathForFile: (file) => webUtils.getPathForFile(file),
 });
