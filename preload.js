@@ -43,4 +43,7 @@ contextBridge.exposeInMainWorld('terminalAPI', {
   onSwitchTab: (cb) => ipcRenderer.on('switch-tab', (_e, target) => cb(target)),
   onRequestNewTab: (cb) => ipcRenderer.on('request-new-tab', () => cb()),
   onRequestCloseTab: (cb) => ipcRenderer.on('request-close-tab', () => cb()),
+
+  // Tab context menu
+  showTabContextMenu: (tabId) => ipcRenderer.send('tab-context-menu', tabId),
 });

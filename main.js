@@ -815,6 +815,36 @@ ipcMain.on('close-tab', (event, tabId) => {
   }
 });
 
+ipcMain.on('tab-context-menu', (event, tabId) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (!win) return;
+  const entry = windows.get(win.id);
+  if (!entry) return;
+  const tab = entry.tabs.get(tabId);
+  if (!tab) return;
+
+  const procs = getRunningChildren(tab.ptyProcess.pid);
+  const cwd = getTabCwd(tab) || tab.startDir;
+
+  const menu = Menu.buildFromTemplate([
+    {
+      label: 'Move to New Terminal',
+      enabled: procs.length === 0 && entry.tabs.size > 1,
+      click: () => {
+        // Close this tab (kills PTY), then open a new terminal process in the same dir
+        closeTab(win.id, tabId);
+        if (app.isPackaged) {
+          const appPath = path.dirname(path.dirname(path.dirname(app.getAppPath())));
+          spawn('open', ['-n', appPath, '--args', cwd], { detached: true, stdio: 'ignore' });
+        } else {
+          spawn(process.execPath, ['.', cwd], { detached: true, stdio: 'ignore', cwd: __dirname });
+        }
+      },
+    },
+  ]);
+  menu.popup({ window: win });
+});
+
 ipcMain.on('set-active-tab', (event, tabId) => {
   const win = BrowserWindow.fromWebContents(event.sender);
   const entry = windows.get(win.id);
