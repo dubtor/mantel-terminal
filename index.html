@@ -232,6 +232,7 @@
       padding: 0 8px 0 11px;
       font-size: 11px;
       font-weight: 500;
+      line-height: 1;
       cursor: pointer;
       white-space: nowrap;
       flex-shrink: 1;
@@ -250,7 +251,7 @@
       z-index: 2;
       height: calc(100% - 1px);
       margin-bottom: -2px;
-      padding-bottom: 2px;
+      padding-bottom: 0;
     }
 
     /* Curved connectors for active tab */
@@ -286,7 +287,7 @@
       width: 16px;
       height: 16px;
       border-radius: 4px;
-      font-size: 12px;
+      font-size: 11px;
       line-height: 1;
       opacity: 0;
       flex-shrink: 0;
@@ -341,6 +342,7 @@
       border-radius: 4px;
       cursor: pointer;
       opacity: 0.5;
+      line-height: 1;
       -webkit-app-region: no-drag;
       transition: opacity 0.1s;
     }
@@ -491,6 +493,19 @@
 
     // === Tab State ===
     const tabs = new Map(); // tabId -> { terminal, fitAddon, container, tabButton, titleSpan, cwd, projectInfo }
+
+    function focusActiveTerminal() {
+      const tab = tabs.get(activeTabId);
+      if (tab) tab.terminal.focus();
+    }
+
+    // Always return focus to terminal after clicking anywhere (banner, tabs, etc.)
+    document.addEventListener('mouseup', (e) => {
+      if (!e.target.closest('.xterm')) {
+        setTimeout(focusActiveTerminal, 0);
+      }
+    });
+
     const tabOrder = [];
     let activeTabId = null;
     let currentFontSize = 13;
@@ -805,6 +820,7 @@
               ev.stopPropagation();
               recentDropdown.style.display = 'none';
               window.terminalAPI.navigateToDir(dir);
+              focusActiveTerminal();
             };
             recentDropdown.appendChild(item);
           });
@@ -816,6 +832,7 @@
         document.addEventListener('click', () => {
           document.getElementById('recent-dirs-dropdown').style.display = 'none';
           document.getElementById('run-scripts-dropdown').style.display = 'none';
+          focusActiveTerminal();
         });
         document.getElementById('recent-dirs-dropdown').addEventListener('click', (e) => e.stopPropagation());
         document.getElementById('run-scripts-dropdown').addEventListener('click', (e) => e.stopPropagation());
@@ -849,6 +866,7 @@
               ev.stopPropagation();
               runDropdown.style.display = 'none';
               window.terminalAPI.runScript(`${prefix} ${name}`);
+              focusActiveTerminal();
             };
             runDropdown.appendChild(item);
           });
