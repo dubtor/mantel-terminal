@@ -64,9 +64,11 @@ mkdir .mantel
 | `backgroundColor` | Tab bar and info bar background color (hex). Falls back to auto-generated color |
 | `icon` | Path to icon file, relative to project root. Supports png, jpg, svg, webp, gif, ico |
 
-`mantel init` automatically populates `name` from `package.json` and detects common icon files (`favicon`, `logo`, `icon`, etc.) up to 3 directories deep when `--name` or `--icon` are not provided.
+`mantel init` with no flags launches an interactive wizard that suggests values based on existing config or auto-detection. It populates `name` from `package.json`, detects `backgroundColor` from web manifests or `<meta name="theme-color">` tags, and finds common icon files (`favicon`, `logo`, `icon`, etc.) up to 3 directories deep.
 
-Use `mantel init --force` to re-run auto-detection for all fields, even if a config already exists. Fields explicitly passed in the same command (e.g. `--name`) are kept; everything else is re-detected.
+When flags are provided (e.g. `--name`, `--icon`), it runs non-interactively and auto-detects any fields not explicitly set.
+
+Use `mantel init --redetect` to re-run auto-detection for all fields, even if a config already exists. Fields explicitly passed in the same command (e.g. `--name`) are kept; everything else is re-detected.
 
 ## Theme
 

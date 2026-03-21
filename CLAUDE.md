@@ -10,8 +10,10 @@ Mantel is an Electron-based terminal wrapper that displays project-specific bann
 
 - `npm start` — Launch the Electron app
 - `npm run rebuild` — Rebuild native modules (node-pty) after Electron version changes
-- `./wt [directory]` — Shell wrapper to launch the terminal in a specific directory
-- `./wt --set-banner <image-path> [project-dir]` — Set a project banner image
+- `./mantel [directory]` — Launch the terminal in a specific directory
+- `./mantel init` — Interactive project setup wizard (creates `.mantel/config.json`)
+- `./mantel init --name "X" --background-color "#hex" --icon path` — Non-interactive setup (auto-detects unset fields)
+- `./mantel init --redetect` — Re-run auto-detection for all unset fields
 
 There are no tests or linting configured.
 

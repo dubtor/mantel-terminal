@@ -1,13 +1,13 @@
 #!/bin/bash
 # Mantel — Terminal Wrapper
 # Usage:
-#   mantel                              - Open in current directory
-#   mantel /path/to/project             - Open in specific directory
-#   mantel init                         - Initialize .mantel/ in current directory
+#   mantel                                   - Open in current directory
+#   mantel /path/to/project                  - Open in specific directory
+#   mantel init                              - Interactive setup wizard
+#   mantel init --name "My Project"          - Set project name (non-interactive)
 #   mantel init --background-color "#1a56db" - Set background color
 #   mantel init --icon ../favicon.png        - Set project icon
-#   mantel init --name "My Project"          - Set project name
-#   mantel init --force                      - Re-detect all fields (keeps explicitly set values)
+#   mantel init --redetect                   - Re-detect all fields (keeps explicitly set values)
 
 SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "$0" 2>/dev/null || realpath "$0" 2>/dev/null || echo "$0")")" && pwd)"
 
@@ -17,153 +17,163 @@ if [ "$1" = "init" ]; then
   BG_COLOR=""
   ICON=""
   NAME=""
-  FORCE=""
+  REDETECT=""
+  HAS_FLAGS=""
 
   while [ $# -gt 0 ]; do
     case "$1" in
-      --background-color) BG_COLOR="$2"; shift 2 ;;
-      --icon) ICON="$2"; shift 2 ;;
-      --name) NAME="$2"; shift 2 ;;
+      --background-color) BG_COLOR="$2"; HAS_FLAGS="1"; shift 2 ;;
+      --icon) ICON="$2"; HAS_FLAGS="1"; shift 2 ;;
+      --name) NAME="$2"; HAS_FLAGS="1"; shift 2 ;;
       --dir) PROJECT_DIR="$2"; shift 2 ;;
-      --force) FORCE="1"; shift ;;
+      --redetect) REDETECT="1"; HAS_FLAGS="1"; shift ;;
       *) echo "Unknown option: $1"; exit 1 ;;
     esac
   done
 
   PROJECT_DIR="$(cd "$PROJECT_DIR" && pwd)"
   MANTEL_DIR="$PROJECT_DIR/.mantel"
+  CONFIG="$MANTEL_DIR/config.json"
   mkdir -p "$MANTEL_DIR"
 
-  # Resolve icon path (stored as relative path in config.json)
-  ICON_PATH=""
-  if [ -n "$ICON" ]; then
-    if [ ! -f "$ICON" ]; then
-      echo "Error: Icon file '$ICON' not found"
-      exit 1
+  # --- Read existing config ---
+  read_config() {
+    [ -f "$CONFIG" ] && node -e "
+      const c = JSON.parse(require('fs').readFileSync('$CONFIG','utf8'));
+      console.log(c['$1'] || '');
+    " 2>/dev/null
+  }
+
+  # --- Auto-detection helpers ---
+  auto_detect_name() {
+    if [ -f "$PROJECT_DIR/package.json" ]; then
+      local detected
+      detected=$(node -e "
+        const p = JSON.parse(require('fs').readFileSync('$PROJECT_DIR/package.json','utf8'));
+        if (p.name) console.log(p.name);
+      " 2>/dev/null)
+      if [ -n "$detected" ]; then echo "$detected"; return; fi
     fi
-    # Convert to path relative to project root
-    ICON_ABS="$(cd "$(dirname "$ICON")" && pwd)/$(basename "$ICON")"
-    ICON_PATH="${ICON_ABS#$PROJECT_DIR/}"
-    echo "Icon set: $ICON_PATH"
-  fi
+    basename "$PROJECT_DIR"
+  }
 
-  # Auto-detect icon if none provided and config doesn't already have one (or --force)
-  if [ -z "$ICON_PATH" ]; then
-    HAS_ICON="no"
-    if [ -z "$FORCE" ]; then
-      HAS_ICON=$(python3 -c "
-import json
-try:
-    c = json.load(open('$MANTEL_DIR/config.json'))
-    print('yes' if c.get('icon') else 'no')
-except: print('no')
-" 2>/dev/null)
-    fi
+  auto_detect_color() {
+    node -e "
+      const fs=require('fs'), path=require('path'), p='$PROJECT_DIR';
+      for (const m of ['manifest.json','site.webmanifest'])
+        for (const d of ['.','public','static','src']) {
+          const f=path.join(p,d,m);
+          try { const j=JSON.parse(fs.readFileSync(f,'utf8'));
+            const c=j.theme_color||j.background_color;
+            if(c){console.log(c);process.exit()} } catch{}
+        }
+      for (const h of ['index.html','public/index.html','src/index.html']) {
+        try { const t=fs.readFileSync(path.join(p,h),'utf8');
+          const m=t.match(/<meta[^>]*name=[\"']theme-color[\"'][^>]*content=[\"']([#0-9a-fA-F]+)[\"']/)||
+                  t.match(/<meta[^>]*content=[\"']([#0-9a-fA-F]+)[\"'][^>]*name=[\"']theme-color[\"']/);
+          if(m){console.log(m[1]);process.exit()} } catch{}
+      }
+    " 2>/dev/null
+  }
 
-    if [ "$HAS_ICON" = "no" ]; then
-      ICON_NAMES="favicon favico logo icon app-icon appicon logo-icon brand"
-      ICON_EXTS="png jpg jpeg gif webp svg"
-
-      for name in $ICON_NAMES; do
-        for ext in $ICON_EXTS; do
-          MATCH=$(find "$PROJECT_DIR" -maxdepth 3 -name "${name}.${ext}" -not -path '*/node_modules/*' -not -path '*/.git/*' -not -path '*/.mantel/*' -print -quit 2>/dev/null)
-          if [ -n "$MATCH" ]; then
-            ICON_PATH="${MATCH#$PROJECT_DIR/}"
-            echo "Auto-detected icon: $ICON_PATH"
-            break 2
-          fi
-        done
+  auto_detect_icon() {
+    local icon_names="favicon favico logo icon app-icon appicon logo-icon brand"
+    local icon_exts="png jpg jpeg gif webp svg"
+    for iname in $icon_names; do
+      for ext in $icon_exts; do
+        local match
+        match=$(find "$PROJECT_DIR" -maxdepth 3 -name "${iname}.${ext}" -not -path '*/node_modules/*' -not -path '*/.git/*' -not -path '*/.mantel/*' -print -quit 2>/dev/null)
+        if [ -n "$match" ]; then
+          echo "${match#$PROJECT_DIR/}"
+          return
+        fi
       done
+    done
+  }
+
+  # --- Prompt helper: shows default, returns user input or default ---
+  prompt_field() {
+    local label="$1" existing="$2" detected="$3" hint="$4"
+    local default="" hint_text=""
+    if [ -n "$existing" ]; then
+      default="$existing"; hint_text="Current: $existing"
+    elif [ -n "$detected" ]; then
+      default="$detected"; hint_text="Suggested: $detected"
+    fi
+    if [ -n "$hint_text" ]; then
+      printf "  %s \033[90m(%s)\033[0m: " "$label" "$hint_text"
+    else
+      printf "  %s \033[90m(%s)\033[0m: " "$label" "$hint"
+    fi
+    local input; read -r input
+    echo "${input:-$default}"
+  }
+
+  # --- Resolve icon to relative path from project root ---
+  resolve_icon() {
+    local icon="$1"
+    [ -z "$icon" ] && return
+    if [ ! -f "$icon" ] && [ ! -f "$PROJECT_DIR/$icon" ]; then
+      echo "Error: Icon file '$icon' not found" >&2; exit 1
+    fi
+    if [ -f "$icon" ]; then
+      local abs; abs="$(cd "$(dirname "$icon")" && pwd)/$(basename "$icon")"
+      echo "${abs#$PROJECT_DIR/}"
+    else
+      echo "$icon"
+    fi
+  }
+
+  # --- Interactive mode (no flags + tty) ---
+  if [ -z "$HAS_FLAGS" ] && [ -t 0 ]; then
+    echo "mantel init — $(basename "$PROJECT_DIR")"
+    NAME=$(prompt_field "Project name" "$(read_config name)" "$(auto_detect_name)" "")
+    BG_COLOR=$(prompt_field "Background color" "$(read_config backgroundColor)" "$(auto_detect_color)" "hex, e.g. #1a56db — leave empty to skip")
+    ICON=$(prompt_field "Icon path" "$(read_config icon)" "$(auto_detect_icon)" "relative path to image — leave empty to skip")
+    echo ""
+  else
+    # Non-interactive: auto-detect anything not explicitly provided
+    should_detect() {
+      # Detect if: field not passed via flag AND (--redetect OR field not in existing config)
+      [ -z "$1" ] && { [ -n "$REDETECT" ] || [ -z "$(read_config "$2")" ]; }
+    }
+    if should_detect "$NAME" "name"; then NAME="$(auto_detect_name)"; fi
+    if should_detect "$BG_COLOR" "backgroundColor"; then
+      BG_COLOR="$(auto_detect_color)"
+      [ -n "$BG_COLOR" ] && echo "Auto-detected color: $BG_COLOR"
+    fi
+    if should_detect "$ICON" "icon"; then
+      ICON="$(auto_detect_icon)"
+      [ -n "$ICON" ] && echo "Auto-detected icon: $ICON"
     fi
   fi
 
-  # Build or update config.json
-  CONFIG="$MANTEL_DIR/config.json"
-  if [ -f "$CONFIG" ]; then
-    # Merge with existing config
-    EXISTING=$(cat "$CONFIG")
+  # Resolve icon path
+  ICON_PATH="$(resolve_icon "$ICON")"
+
+  # --- Merge into config.json ---
+  EXISTING="{}"; [ -f "$CONFIG" ] && EXISTING=$(cat "$CONFIG")
+
+  NEW_CONFIG=$(node -e "
+    const config = JSON.parse(process.argv[1]);
+    const name = process.argv[2], color = process.argv[3], icon = process.argv[4];
+    if (name) config.name = name;
+    if (color) config.backgroundColor = color;
+    if (icon) config.icon = icon;
+    console.log(JSON.stringify(config, null, 2));
+  " "$EXISTING" "$NAME" "$BG_COLOR" "$ICON_PATH")
+
+  echo "$NEW_CONFIG" > "$CONFIG"
+
+  if [ "$EXISTING" = "{}" ]; then
+    echo "Wrote .mantel/config.json"
+  elif [ "$EXISTING" = "$NEW_CONFIG" ]; then
+    echo "No changes"
   else
-    EXISTING="{}"
+    echo "Updated .mantel/config.json"
   fi
-
-  # Use python3 to merge JSON (available on macOS)
-  # Write existing config to temp file for python to read
-  EXISTING_TMP="$CONFIG.existing"
-  echo "$EXISTING" > "$EXISTING_TMP"
-
-  BG_COLOR="$BG_COLOR" NAME="$NAME" ICON_PATH="$ICON_PATH" PROJECT_DIR="$PROJECT_DIR" \
-  EXISTING_FILE="$EXISTING_TMP" FORCE="$FORCE" \
-  python3 << 'PYEOF' > "$CONFIG.tmp"
-import json, sys, os, re
-
-config = json.loads(open(os.environ['EXISTING_FILE']).read())
-bg_color = os.environ.get('BG_COLOR', '')
-name = os.environ.get('NAME', '')
-icon_path = os.environ.get('ICON_PATH', '')
-project = os.environ['PROJECT_DIR']
-force = os.environ.get('FORCE', '')
-
-# With --force, clear fields not explicitly set so auto-detection re-runs
-if force:
-    if not bg_color: config.pop('backgroundColor', None)
-    if not name: config.pop('name', None)
-    if not icon_path: config.pop('icon', None)
-
-if bg_color: config['backgroundColor'] = bg_color
-if name: config['name'] = name
-if icon_path: config['icon'] = icon_path
-
-# Auto-detect backgroundColor if not set
-if not config.get('backgroundColor') and not bg_color:
-    detected_color = None
-    # 1. Check PWA manifest (manifest.json, site.webmanifest)
-    for mname in ['manifest.json', 'site.webmanifest']:
-        for subdir in ['.', 'public', 'static', 'src']:
-            mp = os.path.join(project, subdir, mname)
-            if os.path.isfile(mp):
-                try:
-                    m = json.load(open(mp))
-                    detected_color = m.get('theme_color') or m.get('background_color')
-                    if detected_color: break
-                except: pass
-        if detected_color: break
-    # 2. Check HTML files for <meta name="theme-color">
-    if not detected_color:
-        for hname in ['index.html', 'public/index.html', 'src/index.html']:
-            hp = os.path.join(project, hname)
-            if os.path.isfile(hp):
-                try:
-                    html = open(hp).read()
-                    match = re.search(r'<meta[^>]*name=["\']theme-color["\'][^>]*content=["\'](#[0-9a-fA-F]{3,8})["\']', html)
-                    if not match:
-                        match = re.search(r'<meta[^>]*content=["\'](#[0-9a-fA-F]{3,8})["\'][^>]*name=["\']theme-color["\']', html)
-                    if match:
-                        detected_color = match.group(1)
-                        break
-                except: pass
-    if detected_color:
-        config['backgroundColor'] = detected_color
-        print(f'Auto-detected color: {detected_color}', file=sys.stderr)
-
-# Auto-detect name
-if not config.get('name'):
-    pkg = os.path.join(project, 'package.json')
-    if os.path.isfile(pkg):
-        try:
-            pname = json.load(open(pkg)).get('name', '')
-            if pname: config['name'] = pname
-        except: pass
-    if not config.get('name'):
-        config['name'] = os.path.basename(project)
-
-json.dump(config, sys.stdout, indent=2)
-print()
-PYEOF
-  rm -f "$EXISTING_TMP"
-  mv "$CONFIG.tmp" "$CONFIG"
-
-  echo "Initialized: $MANTEL_DIR/"
   cat "$CONFIG"
+
   exit 0
 fi
 
