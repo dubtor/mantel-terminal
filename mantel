@@ -101,9 +101,9 @@ if [ "$1" = "init" ]; then
       default="$detected"; hint_text="Suggested: $detected"
     fi
     if [ -n "$hint_text" ]; then
-      printf "  %s \033[90m(%s)\033[0m: " "$label" "$hint_text"
+      printf "  %s \033[90m(%s)\033[0m: " "$label" "$hint_text" >&2
     else
-      printf "  %s \033[90m(%s)\033[0m: " "$label" "$hint"
+      printf "  %s \033[90m(%s)\033[0m: " "$label" "$hint" >&2
     fi
     local input; read -r input
     echo "${input:-$default}"

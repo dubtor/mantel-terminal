@@ -11,8 +11,7 @@
     "postinstall": "node scripts/patch-electron-name.js",
     "start": "electron .",
     "rebuild": "electron-rebuild",
-    "dist": "electron-builder --mac",
-    "dist:dmg": "electron-builder --mac dmg"
+    "dist": "npm install --cpu=x64 --os=darwin sharp && npm install --cpu=arm64 --os=darwin sharp && electron-builder --mac dmg"
   },
   "keywords": [],
   "author": "",
@@ -42,24 +41,44 @@
       "node_modules/**/*"
     ],
     "extraResources": [
-      { "from": "mantel", "to": "mantel" }
+      {
+        "from": "mantel",
+        "to": "mantel"
+      }
     ],
     "asarUnpack": [
       "icon.png",
       "assets/**/*",
       "node_modules/sharp/**/*",
+      "node_modules/@img/**/*",
       "node_modules/node-pty/**/*"
     ],
     "mac": {
       "category": "public.app-category.developer-tools",
       "icon": "build/icon.icns",
-      "target": ["dmg"]
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "universal"
+          ]
+        }
+      ],
+      "minimumSystemVersion": "11.0"
     },
     "dmg": {
       "title": "Mantel",
       "contents": [
-        { "x": 130, "y": 220 },
-        { "x": 410, "y": 220, "type": "link", "path": "/Applications" }
+        {
+          "x": 130,
+          "y": 220
+        },
+        {
+          "x": 410,
+          "y": 220,
+          "type": "link",
+          "path": "/Applications"
+        }
       ]
     }
   }

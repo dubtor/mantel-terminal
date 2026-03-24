@@ -458,6 +458,19 @@ function getStartDir() {
   return getDirFromArgs(process.argv) || process.env.HOME || process.cwd();
 }
 
+// Spawn a new Mantel terminal process.
+// Uses the executable binary directly instead of `open -n` to avoid
+// macOS Launch Services keeping ghost dock icons after the process exits.
+function spawnNewTerminal(dir) {
+  if (app.isPackaged) {
+    const appPath = path.dirname(path.dirname(path.dirname(app.getAppPath())));
+    const execPath = path.join(appPath, 'Contents', 'MacOS', 'Mantel');
+    spawn(execPath, ['--', dir], { detached: true, stdio: 'ignore' }).unref();
+  } else {
+    spawn(process.execPath, ['.', dir], { detached: true, stdio: 'ignore', cwd: __dirname }).unref();
+  }
+}
+
 // Build project info payload for a given cwd
 function buildProjectPayload(cwd) {
   const { config, iconData, iconPath, projectRoot } = findProjectConfig(cwd);
@@ -823,12 +836,7 @@ ipcMain.on('tab-context-menu', (event, tabId) => {
       click: () => {
         // Close this tab (kills PTY), then open a new terminal process in the same dir
         closeTab(win.id, tabId);
-        if (app.isPackaged) {
-          const appPath = path.dirname(path.dirname(path.dirname(app.getAppPath())));
-          spawn('open', ['-n', appPath, '--args', cwd], { detached: true, stdio: 'ignore' });
-        } else {
-          spawn(process.execPath, ['.', cwd], { detached: true, stdio: 'ignore', cwd: __dirname });
-        }
+        spawnNewTerminal(cwd);
       },
     },
   ]);
@@ -1006,7 +1014,7 @@ function installCLI() {
     '  exec "$BUNDLED_SCRIPT" "$@"',
     'fi',
     '',
-    `open -n -a "${appPath}" --args "$@"`,
+    `"${appPath}/Contents/MacOS/Mantel" -- "$@" &`,
     '',
   ].join('\n');
 
@@ -1045,7 +1053,7 @@ function writeFinderActions(appPath) {
   const mantelHome = path.join(process.env.HOME, '.mantel');
   const actions = [
     { name: 'New Mantel Tab Here', cmd: `mkdir -p "${mantelHome}" && for f in "$@"; do echo "$f" > "${mantelHome}/pending-tab"; open -a "${appPath}"; done` },
-    { name: 'New Mantel Terminal Here', cmd: `for f in "$@"; do open -n -a "${appPath}" --args "$f"; done` },
+    { name: 'New Mantel Terminal Here', cmd: `for f in "$@"; do "${appPath}/Contents/MacOS/Mantel" -- "$f" & done` },
   ];
 
   for (const action of actions) {
@@ -1232,15 +1240,7 @@ function buildMenu(pkg) {
           accelerator: 'CmdOrCtrl+N',
           click: (_item, win) => {
             const cwd = win ? getActiveTabCwdForWindow(win) : null;
-            const dir = cwd || getStartDir();
-            if (app.isPackaged) {
-              // Packaged: launch the .app bundle as a new process
-              const appPath = path.dirname(path.dirname(path.dirname(app.getAppPath())));
-              spawn('open', ['-n', appPath, '--args', dir], { detached: true, stdio: 'ignore' });
-            } else {
-              // Dev: launch a new Electron process
-              spawn(process.execPath, ['.', dir], { detached: true, stdio: 'ignore', cwd: __dirname });
-            }
+            spawnNewTerminal(cwd || getStartDir());
           },
         },
         {
@@ -1352,13 +1352,7 @@ if (process.argv.includes('--new-tab')) {
           click: () => {
             const focused = BrowserWindow.getFocusedWindow();
             const cwd = focused ? getActiveTabCwdForWindow(focused) : null;
-            const dir = cwd || getStartDir();
-            if (app.isPackaged) {
-              const appPath = path.dirname(path.dirname(path.dirname(app.getAppPath())));
-              spawn('open', ['-n', appPath, '--args', dir], { detached: true, stdio: 'ignore' });
-            } else {
-              spawn(process.execPath, ['.', dir], { detached: true, stdio: 'ignore', cwd: __dirname });
-            }
+            spawnNewTerminal(cwd || getStartDir());
           },
         },
         {
@@ -1384,7 +1378,7 @@ if (process.argv.includes('--new-tab')) {
 
     // Watch for pending-tab requests from Finder "New Tab Here" action
     const pendingFile = path.join(MANTEL_HOME, 'pending-tab');
-    fs.watch(MANTEL_HOME, (_eventType, filename) => {
+    const pendingWatcher = fs.watch(MANTEL_HOME, (_eventType, filename) => {
       if (filename !== 'pending-tab') return;
       try {
         const dir = fs.readFileSync(pendingFile, 'utf8').trim();
@@ -1397,6 +1391,23 @@ if (process.argv.includes('--new-tab')) {
         if (entry) createTab(targetWin.id, dir);
         targetWin.focus();
       } catch (_e) { /* file already consumed or not ready */ }
+    });
+
+    // Clean up all handles on quit so the process exits cleanly
+    app.on('will-quit', () => {
+      pendingWatcher.close();
+      for (const [, entry] of windows) {
+        for (const [, tab] of entry.tabs) {
+          clearInterval(tab.pollInterval);
+          try { tab.ptyProcess.kill(); } catch (_e) { /* */ }
+        }
+      }
+      windows.clear();
+    });
+
+    // Failsafe: force exit if the process lingers after quit
+    app.on('quit', () => {
+      setTimeout(() => process.exit(0), 500);
     });
   });
 
